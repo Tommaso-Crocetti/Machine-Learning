@@ -14,7 +14,7 @@ def Tanh(a):
     def tanh(x):
         return np.sum((2 * Sigmoid(a)(x)), -1)
     return tanh
-
+#ciao
 class Type(Enum):
     INPUT = 1
     HIDDEN = 2
