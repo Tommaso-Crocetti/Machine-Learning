@@ -1,11 +1,11 @@
 from abc import ABC, abstractmethod
 from enum import Enum
 import numpy as np
+import math
 import matplotlib
 import pandas as pd
 from ucimlrepo import fetch_ucirepo
 
-# Definire un'interfaccia chiamata "Figura"
 class Function(ABC):
     
     @abstractmethod
@@ -15,7 +15,6 @@ class Function(ABC):
     @abstractmethod
     def derivate(self):
         pass
-
 
 class Id(Function):
 
@@ -28,15 +27,15 @@ class Id(Function):
         def id_der(x):
             return 1
         return id_der
-    
+
 class Sigmoid(Function):
 
     def __init__(self, a):
-        self.a = a 
+        self.a = a
 
     def activation(self):
         def sigmoid(x):
-            return 1 / (1 + np.exp((self.a * -x)))
+            return 1 / (1 + np.exp(-(self.a * x)))
         return sigmoid
 
     def derivate(self):
@@ -60,7 +59,6 @@ class Tanh(Function):
             return 1 - np.square(self.activation()(x))
         return tanh_der
 
-
 class Type(Enum):
     INPUT = 1
     HIDDEN = 2
@@ -78,7 +76,7 @@ class Layer:
             self.weight_matrix = np.eye(neurons)
         else:
             self.weights = weights + 1
-            self.weight_matrix = np.random.random((self.neurons, self.weights))
+            self.weight_matrix = (np.random.random((self.neurons, self.weights)) - 0.5) *  0.1
 
     def net(self, o):
         if self.type != Type.INPUT:
@@ -92,7 +90,6 @@ class Layer:
     def der_act(self, o):
         f = np.vectorize(self.activation_derivate)
         return f(self.net(o))
-
 
 class Network:
 
@@ -121,18 +118,19 @@ class Network:
         for index, row in X.iterrows():
             output = self.network_output(row)
             target_value = y.iloc[index]
+            print(target_value, output)
             error += np.square(target_value - output)
         return error
 
     def backpropagation_iteration(self, x, y):
-        output = self.network_output(x);
+        output = self.network_output(x)
         store_gradient = []
+        print(output)
         store_output_delta = (y.iloc[0] - output) * self.output_layer.der_act(self.store_hidden_result[self.depth - 1])
         current_matrix = np.zeros((self.output_layer.neurons, self.output_layer.weights));
         updated_hidden_result = np.concatenate((np.array([1]), self.store_hidden_result[self.depth - 1]))
         for i in range(self.output_layer.neurons):
             for j in range(self.output_layer.weights):
-                # Assicurati di accedere a un singolo elemento dell'array
                 current_matrix[i][j] = store_output_delta * updated_hidden_result[j]
         store_gradient.append(current_matrix)
 
@@ -160,7 +158,6 @@ class Network:
             next_layer_delta = store_current_hidden_layer_delta
             store_gradient.append(current_matrix)
 
-
         current_hidden_layer = self.hidden_layers[0]
         store_current_hidden_layer_delta = np.zeros(current_hidden_layer.neurons)
         current_matrix = np.zeros((current_hidden_layer.neurons, current_hidden_layer.weights));
@@ -179,17 +176,18 @@ class Network:
         batch_gradient.append(np.zeros((self.output_layer.neurons, self.output_layer.weights)))
         for index, row in X.iterrows():
             current_gradient = self.backpropagation_iteration(row, y.iloc[index])
-            batch_gradient = [batch_gradient[i] + current_gradient[i] for i in range(self.depth + 1)]
+            batch_gradient = [batch_gradient[i] - current_gradient[i] for i in range(self.depth + 1)]
         for i in range(self.depth):
-            self.hidden_layers[i].weight_matrix += batch_gradient[i]
-        self.output_layer.weight_matrix += batch_gradient[self.depth]
+            self.hidden_layers[i].weight_matrix += batch_gradient[i] * 0.05
+        self.output_layer.weight_matrix += batch_gradient[self.depth] *0.05
 
     def backpropagation_online(self, X, y):
         for index, row in X.iterrows():
             current_gradient = self.backpropagation_iteration(row, y.iloc[index])
             for i in range(self.depth):
-                self.hidden_layers[i].weight_matrix += current_gradient[i]
-                self.output_layer.weight_matrix += current_gradient[self.depth]
+                self.hidden_layers[i].weight_matrix -= current_gradient[i]
+            self.output_layer.weight_matrix -= current_gradient[self.depth]
+
 def main():
 
     monk_s_problems = fetch_ucirepo(id=70) 
@@ -198,9 +196,15 @@ def main():
     X = monk_s_problems.data.features 
     y = monk_s_problems.data.targets 
 
-    layer = Layer(3, 3, Tanh(2), Type.INPUT)
-    network = Network(2, X.shape[1], [3, 3, 1], [Sigmoid(1), Sigmoid(1), Tanh(2)])
+
+    network = Network(2, X.shape[1], [3, 3, 1], [Sigmoid(1), Sigmoid(1), Sigmoid(1)])
+    #print(network.LMS(X, y))
     print(network.backpropagation_batch(X, y))
+    print(network.LMS(X, y))
+    network.backpropagation_batch(X, y)
+    for i in range(20):
+        network.backpropagation_batch(X, y)
+    print(network.LMS(X, y))
 
 if __name__ == "__main__":
     main()
