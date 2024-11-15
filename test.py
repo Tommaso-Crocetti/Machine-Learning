@@ -117,26 +117,38 @@ class Network:
         error = 0
         for index, row in X.iterrows():
             output = self.network_output(row)
+            if output >= 0.5:
+                discrete_output = 1
+            else:
+                discrete_output = 0
             target_value = y.iloc[index]
-            print(target_value, output)
-            error += np.square(target_value - output)
+            error += np.square(target_value - discrete_output)
         return error
 
     def backpropagation_iteration(self, x, y):
+        #calcolo dell'output continuo della rete
         output = self.network_output(x)
+        #inizializzazione della matrice contenente i gradienti di tutti i pesi della rete
         store_gradient = []
-        print(output)
+        #calcolo del delta dell'output layer (in questo caso della singola output unit)
         store_output_delta = (y.iloc[0] - output) * self.output_layer.der_act(self.store_hidden_result[self.depth - 1])
-        current_matrix = np.zeros((self.output_layer.neurons, self.output_layer.weights));
+        #inizializzione della matrice contenente i grandienti dei pesi dell'output layer
+        current_matrix = np.zeros((self.output_layer.neurons, self.output_layer.weights))
+        #aggiungo il risultato del bias al vettore degli output dell'ultimo hidden layer
         updated_hidden_result = np.concatenate((np.array([1]), self.store_hidden_result[self.depth - 1]))
+        #inizio a iterare sugli output neruons
         for i in range(self.output_layer.neurons):
+            #itero sui pesi dei singoli output neurons
             for j in range(self.output_layer.weights):
+                #riempimento della matrice con i gradienti peso per peso 
                 current_matrix[i][j] = store_output_delta * updated_hidden_result[j]
+        #aggiunta alla matrice totale dei gradienti la matrice dei gradienti dell'output layer
         store_gradient.append(current_matrix)
+
 
         current_hidden_layer = self.hidden_layers[self.depth - 1]
         store_current_hidden_layer_delta = np.zeros(current_hidden_layer.neurons)
-        current_matrix = np.zeros((current_hidden_layer.neurons, current_hidden_layer.weights));
+        current_matrix = np.zeros((current_hidden_layer.neurons, current_hidden_layer.weights))
         updated_hidden_result = np.concatenate((np.array([1]), self.store_hidden_result[self.depth - 2]))
         for index_neuron in range(current_hidden_layer.neurons):
             store_current_hidden_layer_delta[index_neuron] = store_output_delta * self.output_layer.weight_matrix[0][index_neuron] * (current_hidden_layer.der_act(self.store_hidden_result[self.depth - 2])[index_neuron])
@@ -148,11 +160,11 @@ class Network:
         for hidden_layer_index in range(self.depth - 2, 0, -1):
             current_hidden_layer = self.hidden_layers[hidden_layer_index]
             store_current_hidden_layer_delta = np.zeros(current_hidden_layer.neurons)
-            current_matrix = np.zeros((current_hidden_layer.neurons, current_hidden_layer.weights));
+            current_matrix = np.zeros((current_hidden_layer.neurons, current_hidden_layer.weights))
             updated_hidden_result = np.concatenate((np.array([1]), self.store_hidden_result[hidden_layer_index - 1]))
             for index_neuron in range(current_hidden_layer.neurons):
                 counter = np.dot(next_layer_delta, self.hidden_layers[hidden_layer_index + 1].weight_matrix[:,index_neuron + 1])
-                store_current_hidden_layer_delta[index_neuron] = counter * (current_hidden_layer.der_act(self.store_hidden_result[index_neuron - 1])[index_neuron])
+                store_current_hidden_layer_delta[index_neuron] = counter * (current_hidden_layer.der_act(self.store_hidden_result[hidden_layer_index - 1])[index_neuron])
                 for j in range(current_hidden_layer.weights):
                     current_matrix[index_neuron][j] = store_current_hidden_layer_delta[index_neuron] * updated_hidden_result[j]
             next_layer_delta = store_current_hidden_layer_delta
@@ -160,10 +172,10 @@ class Network:
 
         current_hidden_layer = self.hidden_layers[0]
         store_current_hidden_layer_delta = np.zeros(current_hidden_layer.neurons)
-        current_matrix = np.zeros((current_hidden_layer.neurons, current_hidden_layer.weights));
+        current_matrix = np.zeros((current_hidden_layer.neurons, current_hidden_layer.weights))
         updated_hidden_result = np.concatenate((np.array([1]), x))
         for index_neuron in range(current_hidden_layer.neurons):
-            counter = np.dot(next_layer_delta, self.hidden_layers[0].weight_matrix[:,index_neuron + 1])
+            counter = np.dot(next_layer_delta, self.hidden_layers[1].weight_matrix[:,index_neuron + 1])
             store_current_hidden_layer_delta[index_neuron] = counter * current_hidden_layer.der_act(x)[index_neuron]
             for j in range(current_hidden_layer.weights):
                 current_matrix[index_neuron][j] = store_current_hidden_layer_delta[index_neuron] * updated_hidden_result[j]
@@ -179,7 +191,7 @@ class Network:
             batch_gradient = [batch_gradient[i] - current_gradient[i] for i in range(self.depth + 1)]
         for i in range(self.depth):
             self.hidden_layers[i].weight_matrix += batch_gradient[i] * 0.05
-        self.output_layer.weight_matrix += batch_gradient[self.depth] *0.05
+        self.output_layer.weight_matrix += batch_gradient[self.depth] * 0.05
 
     def backpropagation_online(self, X, y):
         for index, row in X.iterrows():
@@ -197,14 +209,17 @@ def main():
     y = monk_s_problems.data.targets 
 
 
-    network = Network(2, X.shape[1], [3, 3, 1], [Sigmoid(1), Sigmoid(1), Sigmoid(1)])
+    network = Network(4, X.shape[1], [4 ,10, 4, 2, 1], [Sigmoid(1), Sigmoid(1), Sigmoid(1), Sigmoid(1), Sigmoid(1), Sigmoid(1)])
     #print(network.LMS(X, y))
-    print(network.backpropagation_batch(X, y))
-    print(network.LMS(X, y))
+    #print(network.backpropagation_batch(X, y))
+    #print(network.LMS(X, y))
+ 
     network.backpropagation_batch(X, y)
-    for i in range(20):
+    print(network.network_output(X.iloc[0]))
+    for i in range(1):
         network.backpropagation_batch(X, y)
-    print(network.LMS(X, y))
+    print(network.network_output(X.iloc[0]))
+    print(network.network_output([1000,1000,1000,1000,1000,1000]))
 
 if __name__ == "__main__":
     main()
