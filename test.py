@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from enum import Enum
 import numpy as np
 import math
-import matplotlib
+import matplotlib.pyplot as plt
 import pandas as pd
 from ucimlrepo import fetch_ucirepo
 
@@ -47,16 +47,15 @@ class Tanh(Function):
 
     def __init__(self, a):
         self.a = a
-        self.sigmoid = Sigmoid(self.a).activation()
 
     def activation(self):
         def tanh(x):
-            return np.sum((2 * self.sigmoid(x)), -1)
+            return np.tanh(self.a*x/2)
         return tanh
     
     def derivate(self):
         def tanh_der(x):
-            return 1 - np.square(self.activation()(x))
+            return 1 - (self.activation()(x))**2
         return tanh_der
 
 class Type(Enum):
@@ -145,6 +144,31 @@ class Network:
                 current_matrix[i][j] = store_output_delta * updated_hidden_result[j]
         #aggiunta alla matrice totale dei gradienti la matrice dei gradienti dell'output layer
         store_gradient.append(current_matrix)
+
+        if (self.depth == 1):
+            current_hidden_layer = self.hidden_layers[0]
+            store_current_hidden_layer_delta = np.zeros(current_hidden_layer.neurons)
+            #inizializzo la matrice che conterrà i gradienti dei pesi dell' hidden layer più vicino all'output layer
+            current_matrix = np.zeros((current_hidden_layer.neurons, current_hidden_layer.weights))
+            updated_hidden_result = np.concatenate((np.array([1]), x))
+            #itero sui neuroni del layer corrente
+            for index_neuron in range(current_hidden_layer.neurons):
+                #calcolo il prodotto scalare tra il vettore contenente il delta del layer più a destra e il vettore contenente i pesi 
+                #di ogni neurone del layer più a destra che li collegano all'index_neuronesimo neurone
+                counter = np.dot(store_output_delta, self.output_layer.weight_matrix[:,index_neuron + 1])
+                #aggiungo alla matrice contenente i delta del layer corrente il prodotto di counter e la derivata della funzione di attivazione
+                #applicata alla net delle uscite dei neuroni precedenti
+                store_current_hidden_layer_delta[index_neuron] = counter * current_hidden_layer.der_act(x)[index_neuron]
+                #itero sui pesi dei singoli nueroni del layer corrente
+                for j in range(current_hidden_layer.weights):
+                    #aggiungo alla matrice il prodotto del delta del neurone corrente per l'uscita del j-esimo neurone
+                    current_matrix[index_neuron][j] = store_current_hidden_layer_delta[index_neuron] * updated_hidden_result[j]
+                #aggiungo la matrice appena calcolata alla matrice totale
+            store_gradient.append(current_matrix)
+            #inverto l'ordine della matrice contenente i gradienti di ogni peso in modo da avere prima i gradienti del primo hidden layer
+            # e dopo i gradienti dell'output layer 
+            store_gradient.reverse()
+            return store_gradient
 
         #passiamo a valutare i gradienti dell' hidden layer più vicino all'output layer
         current_hidden_layer = self.hidden_layers[self.depth - 1]
@@ -258,18 +282,28 @@ def main():
 
     X_encoded = pd.get_dummies(X, dtype=float, columns=['a1','a2','a3','a4','a5','a6'])
 
-    network = Network(2, X_encoded.shape[1], [5, 4, 1], [Id(), Id(), Sigmoid(1)])
+    network = Network(1, X_encoded.shape[1], [3, 1], [Sigmoid(1), Sigmoid(1)])
     #print(network.LMS(X, y))
     #print(network.backpropagation_batch(X, y))
     #print(network.LMS(X, y))
-    for i in range(100):
+    print(network.network_output([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]))
+    print(network.network_output([1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]))
+    errors = []
+    for i in range(400):
+        errors.append(network.LMS(X_encoded, y))
         network.backpropagation_batch(X_encoded, y)
-
+    plt.figure(figsize=(8, 6))
+    plt.plot(range(400), errors, marker='o', label='Errore LMS')
+    plt.title("Curva dell'Errore LMS all'aumentare delle epoche")
+    plt.xlabel("Epoche")
+    plt.ylabel("Errore LMS")
+    plt.grid()
+    plt.legend()
+    plt.show()
     print(network.LMS(X_encoded, y))
-    print(network.network_output([1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000]))
-    print(network.network_output([-1000,-1000,-1000,-1000,-1000,-1000,-1000,-1000,-1000,-1000,-1000,-1000,-1000,-1000,-1000,-1000,-1000]))
+    print(network.network_output([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]))
+    print(network.network_output([1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]))
 
-    
 
 if __name__ == "__main__":
     main()
