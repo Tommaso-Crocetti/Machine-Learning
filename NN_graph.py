@@ -10,9 +10,6 @@ def plot_neural_network(network, input, output):
         layers.append(network.hidden_layers[i].neurons)
     layers.append(network.output_layer.neurons)
 
-    
-
-
     pos = {}
     node_labels = {}
     node_colors = {}

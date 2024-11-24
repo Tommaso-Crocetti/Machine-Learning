@@ -107,6 +107,21 @@ class Network:
             self.store_hidden_result.append(np.zeros(self.hidden_layers[i + 1].neurons))
         self.output_layer = Layer(layer_length[hidden_layers_number], self.hidden_layers[hidden_layers_number - 1].neurons, activation_class_arr[hidden_layers_number], Type.OUTPUT)
 
+    def plot(self, errors):
+        plt.figure(figsize=(8, 6))
+        plt.plot(range(len(errors)), errors, marker='o', label='Errore LMS')
+        plt.title("Curva dell'Errore LMS all'aumentare delle epoche")
+        plt.xlabel("Epoche")
+        plt.ylabel("Errore LMS")
+        plt.grid()
+        plt.legend()
+        plt.show()
+
+    def plot_from(self,x):
+        result = self.network_output(x)
+        #sotto considero l'array di result perché per ora il result è un solo valore, poi sarà
+        #un array di valori    
+        plot_neural_network(self, x, result)
 
     def network_output(self, input):
         current_input = self.input_layer.act(input)
@@ -120,14 +135,11 @@ class Network:
         error = 0
         for index, row in X.iterrows():
             output = self.network_output(row)
-            if output >= 0:
+            if output >= 0.5:
                 discrete_output = 1
             else:
-                discrete_output = -1
-            if y.iloc[index].iloc[0] == 0:
-                target_value = -1
-            else:
-                target_value = 1
+                discrete_output = 0
+            target_value = y.iloc[index]
             error += (target_value - discrete_output)**2
         return error
 
@@ -137,7 +149,7 @@ class Network:
         #inizializzazione della matrice contenente i gradienti di tutti i pesi della rete
         store_gradient = []
         #calcolo del delta dell'output layer (in questo caso della singola output unit)
-        store_output_delta = (y.iloc[0] - output) * self.output_layer.der_act(self.store_hidden_result[self.depth-1])
+        store_output_delta = (y - output) * self.output_layer.der_act(self.store_hidden_result[self.depth-1])
         #inizializzione della matrice contenente i grandienti dei pesi dell'output layer
         current_matrix = np.zeros((self.output_layer.neurons, self.output_layer.weights))
         #aggiungo il risultato del bias al vettore degli output dell'ultimo hidden layer
@@ -255,23 +267,27 @@ class Network:
         store_gradient.reverse()
         return store_gradient
 
-    def backpropagation_batch(self, X, y):
-        #inizializzo la matrice che conterrà la somma di tutte le matrici store_gradient per ogni hidden layer
-        batch_gradient = [np.zeros((self.hidden_layers[i].neurons, self.hidden_layers[i].weights)) for i in range(self.depth)]
-        #aggiungo l'ultimo pezzo di batch_gradient che conterrà la somma di tutti i gradienti per l'output layer
-        batch_gradient.append(np.zeros((self.output_layer.neurons, self.output_layer.weights)))
-        #itero sul dataset
-        for index, row in X.iterrows():
-            #calcolo store_gradient per il pattern corrente con il suo target
-            current_gradient = self.backpropagation_iteration(row, y.iloc[index])
-            #aggiungo il gradiente appena calcolato 
-            batch_gradient = [batch_gradient[i] + current_gradient[i] for i in range(self.depth + 1)]
-        #per ogni hidden layer aggiorno i pesi sommando la matrice batch
-        for i in range(self.depth):
-            self.hidden_layers[i].weight_matrix += batch_gradient[i] * 0.1
-        self.output_layer.weight_matrix += batch_gradient[self.depth] * 0.1
+    def backpropagation_batch(self, X, y, batches_number,eta=0.1, lambda_tikonov=0,plot=False):
+        errors = []
+        for i in range(batches_number):
+            errors.append(self.LMS(X, y))
+            #inizializzo la matrice che conterrà la somma di tutte le matrici store_gradient per ogni hidden layer
+            batch_gradient = [np.zeros((self.hidden_layers[i].neurons, self.hidden_layers[i].weights)) for i in range(self.depth)]
+            #aggiungo l'ultimo pezzo di batch_gradient che conterrà la somma di tutti i gradienti per l'output layer
+            batch_gradient.append(np.zeros((self.output_layer.neurons, self.output_layer.weights)))
+            #itero sul dataset
+            for index, row in X.iterrows():
+                #calcolo store_gradient per il pattern corrente con il suo target
+                current_gradient = self.backpropagation_iteration(row, y.iloc[index])
+                #aggiungo il gradiente appena calcolato 
+                batch_gradient = [batch_gradient[i] + current_gradient[i] for i in range(self.depth + 1)]
+            #per ogni hidden layer aggiorno i pesi sommando la matrice batch
+            for i in range(self.depth):
+                self.hidden_layers[i].weight_matrix += (batch_gradient[i] * eta) - (lambda_tikonov * self.hidden_layers[i].weight_matrix)
+            self.output_layer.weight_matrix += (batch_gradient[self.depth] * eta) - (lambda_tikonov * self.output_layer.weight_matrix)
+        if plot:
+            self.plot(errors)
             
-
     def backpropagation_online(self, X, y):
         for index, row in X.iterrows():
             current_gradient = self.backpropagation_iteration(row, y.iloc[index])
@@ -281,46 +297,27 @@ class Network:
 
 def main():
 
-    monk_s_problems = fetch_ucirepo(id=70) 
+    monk_s_problems = pd.read_csv("./monks-3.test",sep = "\s+", header=None) 
     
     # data (as pandas dataframes) 
-    X = monk_s_problems.data.features 
-    y = monk_s_problems.data.targets 
+    n_colonne = monk_s_problems.shape[1]
+    colonne= ['target'] + [ f'featuer{i}' for i in range(1,n_colonne -1)] + ['datanumber']
+    monk_s_problems.columns = colonne
 
-    X_encoded = pd.get_dummies(X, dtype=float, columns=['a1','a2','a3','a4','a5','a6'])
+    X = monk_s_problems.drop(columns=["target", 'datanumber'])
+    y = monk_s_problems["target"] 
 
-    network = Network(1, X_encoded.shape[1], [3, 1], [Tanh(1), Tanh(1)])
-    #print(network.LMS(X, y))
-    #print(network.backpropagation_batch(X, y))
-    #print(network.LMS(X, y))
-    print(network.network_output([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]))
-    print(network.network_output([1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]))
-    errors = []
-    print(network)
-    batches_number = 200
-    plot_from(network,[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1])
-    for i in range(batches_number):
-        errors.append(network.LMS(X_encoded, y))
-        network.backpropagation_batch(X_encoded, y)
-    plt.figure(figsize=(8, 6))
-    plt.plot(range(batches_number), errors, marker='o', label='Errore LMS')
-    plt.title("Curva dell'Errore LMS all'aumentare delle epoche")
-    plt.xlabel("Epoche")
-    plt.ylabel("Errore LMS")
-    plt.grid()
-    plt.legend()
-    plt.show()
-    print(network.LMS(X_encoded, y))
-    print(network.network_output([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]))
-    print(network.network_output([1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]))
+    X_encoded = pd.get_dummies(X, dtype=float, columns=[f'featuer{i}' for i in range(1,n_colonne -1)])
+
+    network = Network(1, X_encoded.shape[1], [3,1], [Sigmoid(1),Sigmoid(1)])
+
+    network.backpropagation_batch(X_encoded, y, batches_number = 200,eta = 0.01, lambda_tikonov= 0.002, plot = True)
     
-    plot_from(network,[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1])
+    print(network.LMS(X_encoded, y))
+    
+    network.plot_from([1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1])
 
-def plot_from(network,x):
-    result = network.network_output(x)
-    #sotto considero l'array di result perché per ora il result è un solo valore, poi sarà
-    #un array di valori    
-    plot_neural_network(network, x, result)
+
 
 if __name__ == "__main__":
     main()
