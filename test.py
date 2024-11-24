@@ -2,9 +2,12 @@ from abc import ABC, abstractmethod
 from enum import Enum
 import numpy as np
 import math
+from NN_graph import plot_neural_network
 import matplotlib.pyplot as plt
 import pandas as pd
 from ucimlrepo import fetch_ucirepo
+
+
 
 class Function(ABC):
     
@@ -75,7 +78,7 @@ class Layer:
             self.weight_matrix = np.eye(neurons)
         else:
             self.weights = weights + 1
-            self.weight_matrix = (np.random.random((self.neurons, self.weights)) - 0.5) *  0.4
+            self.weight_matrix = (np.random.random((self.neurons, self.weights)) - 0.5) *  0.9
 
     def net(self, o):
         if self.type != Type.INPUT:
@@ -117,11 +120,14 @@ class Network:
         error = 0
         for index, row in X.iterrows():
             output = self.network_output(row)
-            if output >= 0.5:
+            if output >= 0:
                 discrete_output = 1
             else:
-                discrete_output = 0
-            target_value = y.iloc[index]
+                discrete_output = -1
+            if y.iloc[index].iloc[0] == 0:
+                target_value = -1
+            else:
+                target_value = 1
             error += (target_value - discrete_output)**2
         return error
 
@@ -141,7 +147,7 @@ class Network:
             #itero sui pesi dei singoli output neurons
             for j in range(self.output_layer.weights):
                 #riempimento della matrice con i gradienti peso per peso 
-                current_matrix[i][j] = store_output_delta * updated_hidden_result[j]
+                current_matrix[i][j] = store_output_delta[0] * updated_hidden_result[j]
         #aggiunta alla matrice totale dei gradienti la matrice dei gradienti dell'output layer
         store_gradient.append(current_matrix)
 
@@ -264,6 +270,7 @@ class Network:
         for i in range(self.depth):
             self.hidden_layers[i].weight_matrix += batch_gradient[i] * 0.1
         self.output_layer.weight_matrix += batch_gradient[self.depth] * 0.1
+            
 
     def backpropagation_online(self, X, y):
         for index, row in X.iterrows():
@@ -282,18 +289,21 @@ def main():
 
     X_encoded = pd.get_dummies(X, dtype=float, columns=['a1','a2','a3','a4','a5','a6'])
 
-    network = Network(1, X_encoded.shape[1], [3, 1], [Sigmoid(1), Sigmoid(1)])
+    network = Network(1, X_encoded.shape[1], [3, 1], [Tanh(1), Tanh(1)])
     #print(network.LMS(X, y))
     #print(network.backpropagation_batch(X, y))
     #print(network.LMS(X, y))
     print(network.network_output([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]))
     print(network.network_output([1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]))
     errors = []
-    for i in range(400):
+    print(network)
+    batches_number = 200
+    plot_from(network,[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1])
+    for i in range(batches_number):
         errors.append(network.LMS(X_encoded, y))
         network.backpropagation_batch(X_encoded, y)
     plt.figure(figsize=(8, 6))
-    plt.plot(range(400), errors, marker='o', label='Errore LMS')
+    plt.plot(range(batches_number), errors, marker='o', label='Errore LMS')
     plt.title("Curva dell'Errore LMS all'aumentare delle epoche")
     plt.xlabel("Epoche")
     plt.ylabel("Errore LMS")
@@ -303,7 +313,14 @@ def main():
     print(network.LMS(X_encoded, y))
     print(network.network_output([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]))
     print(network.network_output([1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]))
+    
+    plot_from(network,[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1])
 
+def plot_from(network,x):
+    result = network.network_output(x)
+    #sotto considero l'array di result perché per ora il result è un solo valore, poi sarà
+    #un array di valori    
+    plot_neural_network(network, x, result)
 
 if __name__ == "__main__":
     main()
