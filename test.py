@@ -267,7 +267,7 @@ class Network:
         store_gradient.reverse()
         return store_gradient
 
-    def backpropagation_batch(self, X, y, batches_number,eta=0.1, lambda_tikonov=0,plot=False):
+    def backpropagation_batch(self, X, y, batches_number,eta=0.1, lambda_tikonov=0,alpha=0,plot=False):
         errors = []
         for i in range(batches_number):
             errors.append(self.LMS(X, y))
@@ -275,6 +275,9 @@ class Network:
             batch_gradient = [np.zeros((self.hidden_layers[i].neurons, self.hidden_layers[i].weights)) for i in range(self.depth)]
             #aggiungo l'ultimo pezzo di batch_gradient che conterrà la somma di tutti i gradienti per l'output layer
             batch_gradient.append(np.zeros((self.output_layer.neurons, self.output_layer.weights)))
+            for j in range(self.depth):
+                self.hidden_layers[j].weight_matrix += alpha*batch_gradient[j]
+            self.output_layer.weight_matrix += alpha*batch_gradient[-1]
             #itero sul dataset
             for index, row in X.iterrows():
                 #calcolo store_gradient per il pattern corrente con il suo target
@@ -285,6 +288,7 @@ class Network:
             for i in range(self.depth):
                 self.hidden_layers[i].weight_matrix += (batch_gradient[i] * eta) - (lambda_tikonov * self.hidden_layers[i].weight_matrix)
             self.output_layer.weight_matrix += (batch_gradient[self.depth] * eta) - (lambda_tikonov * self.output_layer.weight_matrix)
+
         if plot:
             self.plot(errors)
             
@@ -309,7 +313,9 @@ def main():
 
     X_encoded = pd.get_dummies(X, dtype=float, columns=[f'featuer{i}' for i in range(1,n_colonne -1)])
 
-    network = Network(1, X_encoded.shape[1], [3,1], [Sigmoid(1),Sigmoid(1)])
+    network = Network(1, X_encoded.shape[1], [2,1], [Sigmoid(1),Sigmoid(1)])
+
+    #network.plot_from([1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1])
 
     network.backpropagation_batch(X_encoded, y, batches_number = 200,eta = 0.01, lambda_tikonov= 0.002, plot = True)
     
