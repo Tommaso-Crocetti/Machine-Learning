@@ -272,22 +272,25 @@ class Network:
         for i in range(batches_number):
             errors.append(self.LMS(X, y))
             #inizializzo la matrice che conterrà la somma di tutte le matrici store_gradient per ogni hidden layer
-            batch_gradient = [np.zeros((self.hidden_layers[i].neurons, self.hidden_layers[i].weights)) for i in range(self.depth)]
+            batch_gradient = [[np.zeros((self.hidden_layers[i].neurons, self.hidden_layers[i].weights)) for i in range(self.depth)]for i in range(2)]
             #aggiungo l'ultimo pezzo di batch_gradient che conterrà la somma di tutti i gradienti per l'output layer
-            batch_gradient.append(np.zeros((self.output_layer.neurons, self.output_layer.weights)))
+            batch_gradient[0].append(np.zeros((self.output_layer.neurons, self.output_layer.weights)))
+            batch_gradient[1].append(np.zeros((self.output_layer.neurons, self.output_layer.weights)))
             for j in range(self.depth):
-                self.hidden_layers[j].weight_matrix += alpha*batch_gradient[j]
-            self.output_layer.weight_matrix += alpha*batch_gradient[-1]
+                self.hidden_layers[j].weight_matrix += alpha*batch_gradient[0][j]
+                batch_gradient[1][j] = lambda_tikonov * self.hidden_layers[j].weight_matrix
+            batch_gradient[1][-1]= lambda_tikonov * self.output_layer.weight_matrix
+            self.output_layer.weight_matrix += alpha*batch_gradient[0][-1]
             #itero sul dataset
             for index, row in X.iterrows():
                 #calcolo store_gradient per il pattern corrente con il suo target
                 current_gradient = self.backpropagation_iteration(row, y.iloc[index])
                 #aggiungo il gradiente appena calcolato 
-                batch_gradient = [batch_gradient[i] + current_gradient[i] for i in range(self.depth + 1)]
+                batch_gradient[0] = [batch_gradient[0][i] + current_gradient[i] for i in range(self.depth + 1)]
             #per ogni hidden layer aggiorno i pesi sommando la matrice batch
             for i in range(self.depth):
-                self.hidden_layers[i].weight_matrix += (batch_gradient[i] * eta) - (lambda_tikonov * self.hidden_layers[i].weight_matrix)
-            self.output_layer.weight_matrix += (batch_gradient[self.depth] * eta) - (lambda_tikonov * self.output_layer.weight_matrix)
+                self.hidden_layers[i].weight_matrix += (batch_gradient[0][i] * eta) - batch_gradient[1][i]
+            self.output_layer.weight_matrix += (batch_gradient[0][self.depth] * eta) - batch_gradient[1][-1]
 
         if plot:
             self.plot(errors)
@@ -317,7 +320,7 @@ def main():
 
     #network.plot_from([1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1])
 
-    network.backpropagation_batch(X_encoded, y, batches_number = 200,eta = 0.01, lambda_tikonov= 0.002, plot = True)
+    network.backpropagation_batch(X_encoded, y, batches_number = 200,eta = 0.01, lambda_tikonov= 0.02, alpha = 0.01,plot = True)
     
     print(network.LMS(X_encoded, y))
     
