@@ -171,6 +171,51 @@ class Network:
             return (error / X.shape[0])
         return error
 
+    def backpropagation_batch(self, X, y, regression = True, batches_number=100, eta=0.1, lambda_tikonov=0, alpha=0, validation = None, plot=False):
+        errors = []
+        validation_errors = []
+        for i in range(batches_number):
+            if regression:
+                errors.append(self.LMS_regression(X, y))
+            else: 
+                errors.append(self.LMS_classification(X, y))    
+            if validation:
+                if regression:
+                    validation_errors.append(self.LMS_regression(validation[0], validation[1]))
+                else: 
+                    validation_errors.append(self.LMS_classification(validation[0], validation[1]))
+            #inizializzo la matrice che conterrà la somma di tutte le matrici store_gradient per ogni hidden layer
+            batch_gradient = [[np.zeros((self.hidden_layers[i].neurons, self.hidden_layers[i].weights)) for i in range(self.depth)]for i in range(2)]
+            #aggiungo l'ultimo pezzo di batch_gradient che conterrà la somma di tutti i gradienti per l'output layer
+            batch_gradient[0].append(np.zeros((self.output_layer.neurons, self.output_layer.weights)))
+            batch_gradient[1].append(np.zeros((self.output_layer.neurons, self.output_layer.weights)))
+            for j in range(self.depth):
+                self.hidden_layers[j].weight_matrix += alpha*batch_gradient[0][j]
+                batch_gradient[1][j] = lambda_tikonov * self.hidden_layers[j].weight_matrix
+            batch_gradient[1][-1]= lambda_tikonov * self.output_layer.weight_matrix
+            self.output_layer.weight_matrix += alpha*batch_gradient[0][-1]
+            #itero sul dataset
+            for index, row in X.iterrows():
+                #calcolo store_gradient per il pattern corrente con il suo target
+                current_gradient = self.backpropagation_iteration(row, y.iloc[index])
+                #aggiungo il gradiente appena calcolato 
+                batch_gradient[0] = [batch_gradient[0][i] + current_gradient[i] for i in range(self.depth + 1)]
+            #per ogni hidden layer aggiorno i pesi sommando la matrice batch
+            for i in range(self.depth):
+                self.hidden_layers[i].weight_matrix += (batch_gradient[0][i] * eta) - batch_gradient[1][i]
+            self.output_layer.weight_matrix += (batch_gradient[0][self.depth] * eta) - batch_gradient[1][-1]
+        if plot:
+            self.plot(errors, "training_error")
+            if validation: 
+                self.plot(validation_errors, "validation_error")
+            
+    def backpropagation_online(self, X, y):
+        for index, row in X.iterrows():
+            current_gradient = self.backpropagation_iteration(row, y.iloc[index])
+            for i in range(self.depth):
+                self.hidden_layers[i].weight_matrix += current_gradient[i]
+            self.output_layer.weight_matrix += current_gradient[self.depth]
+
     def backpropagation_iteration(self, x, y):
         #calcolo dell'output continuo della rete
         output = self.network_output(x)
@@ -179,7 +224,7 @@ class Network:
         store_output_delta = []
         #calcolo del delta dell'output layer (in questo caso della singola output unit)
         for i in range(self.output_layer.neurons):
-            store_output_delta.append((y - output[i]) * self.output_layer.der_act(self.store_hidden_result[self.depth-1])[i])
+            store_output_delta.append((y[i] - output[i]) * self.output_layer.der_act(self.store_hidden_result[self.depth-1])[i])
         #inizializzione della matrice contenente i grandienti dei pesi dell'output layer
         current_matrix = np.zeros((self.output_layer.neurons, self.output_layer.weights))
         #aggiungo il risultato del bias al vettore degli output dell'ultimo hidden layer
@@ -297,48 +342,3 @@ class Network:
         # e dopo i gradienti dell'output layer 
         store_gradient.reverse()
         return store_gradient
-
-    def backpropagation_batch(self, X, y,regression = True, batches_number=100, eta=0.1, lambda_tikonov=0, alpha=0, validation = None, plot=False):
-        errors = []
-        validation_errors = []
-        for i in range(batches_number):
-            if regression:
-                errors.append(self.LMS_regression(X, y))
-            else: 
-                errors.append(self.LMS_classification(X, y))    
-            if validation:
-                if regression:
-                    validation_errors.append(self.LMS_regression(validation[0], validation[1]))
-                else: 
-                    validation_errors.append(self.LMS_classification(validation[0], validation[1]))
-            #inizializzo la matrice che conterrà la somma di tutte le matrici store_gradient per ogni hidden layer
-            batch_gradient = [[np.zeros((self.hidden_layers[i].neurons, self.hidden_layers[i].weights)) for i in range(self.depth)]for i in range(2)]
-            #aggiungo l'ultimo pezzo di batch_gradient che conterrà la somma di tutti i gradienti per l'output layer
-            batch_gradient[0].append(np.zeros((self.output_layer.neurons, self.output_layer.weights)))
-            batch_gradient[1].append(np.zeros((self.output_layer.neurons, self.output_layer.weights)))
-            for j in range(self.depth):
-                self.hidden_layers[j].weight_matrix += alpha*batch_gradient[0][j]
-                batch_gradient[1][j] = lambda_tikonov * self.hidden_layers[j].weight_matrix
-            batch_gradient[1][-1]= lambda_tikonov * self.output_layer.weight_matrix
-            self.output_layer.weight_matrix += alpha*batch_gradient[0][-1]
-            #itero sul dataset
-            for index, row in X.iterrows():
-                #calcolo store_gradient per il pattern corrente con il suo target
-                current_gradient = self.backpropagation_iteration(row, y.iloc[index])
-                #aggiungo il gradiente appena calcolato 
-                batch_gradient[0] = [batch_gradient[0][i] + current_gradient[i] for i in range(self.depth + 1)]
-            #per ogni hidden layer aggiorno i pesi sommando la matrice batch
-            for i in range(self.depth):
-                self.hidden_layers[i].weight_matrix += (batch_gradient[0][i] * eta) - batch_gradient[1][i]
-            self.output_layer.weight_matrix += (batch_gradient[0][self.depth] * eta) - batch_gradient[1][-1]
-        if plot:
-            self.plot(errors, "training_error")
-            if validation: 
-                self.plot(validation_errors, "validation_error")
-            
-    def backpropagation_online(self, X, y):
-        for index, row in X.iterrows():
-            current_gradient = self.backpropagation_iteration(row, y.iloc[index])
-            for i in range(self.depth):
-                self.hidden_layers[i].weight_matrix += current_gradient[i]
-            self.output_layer.weight_matrix += current_gradient[self.depth]
