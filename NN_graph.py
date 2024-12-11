@@ -49,18 +49,15 @@ def plot_neural_network(network, input, output):
                 node_colors[node_id] = "green"
 
     #mette gli edge tra i neuroni
-    for layer in range(len(layers) - 1):
+    for layer in range(network.depth+1):
         for src in range(-1, layers[layer]):
             for dest in range(layers[layer + 1]):
                 src_id = f"L{layer}_N{src}"
                 dest_id = f"L{layer + 1}_N{dest}"
-                if (layer == 0 ):
+                if (layer < network.depth):
                     G.add_edge(src_id, dest_id)
-                    G[src_id][dest_id]["weight"] = network.hidden_layers[0].weight_matrix[dest][src]
-                elif (layer < len(layers)-1 and layer !=0):
-                    G.add_edge(src_id, dest_id)
-                    G[src_id][dest_id]["weight"] = network.hidden_layers[layer-2].weight_matrix[dest][src]
-                elif (layer == len(layers)-1):
+                    G[src_id][dest_id]["weight"] = network.hidden_layers[layer].weight_matrix[dest][src]
+                elif (layer == ((network.depth))):
                     G.add_edge(src_id, dest_id)
                     G[src_id][dest_id]["weight"] = network.output_layer.weight_matrix[dest][src]
                      
