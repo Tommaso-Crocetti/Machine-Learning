@@ -2,11 +2,11 @@ from abc import ABC, abstractmethod
 from enum import Enum
 import numpy as np
 import math
-from NN_graph import plot_neural_network
+from NN.NN_graph import plot_neural_network
 import matplotlib.pyplot as plt
 import pandas as pd
 from ucimlrepo import fetch_ucirepo
-
+import pickle
 
 
 class Function(ABC):
@@ -121,14 +121,16 @@ class Network:
         self.output_layer = Layer(layer_length[hidden_layers_number], self.hidden_layers[hidden_layers_number - 1].neurons, activation_class_arr[hidden_layers_number], Type.OUTPUT)
 
     def plot(self, errors, filename):
-        plt.figure(figsize=(8, 6))
+        plot = plt.figure(figsize=(8, 6))
         plt.plot(range(len(errors)), errors, marker='o', label='Errore LMS')
         plt.title("Curva dell'Errore LMS all'aumentare delle epoche")
         plt.xlabel("Epoche")
         plt.ylabel("Errore LMS")
         plt.grid()
         plt.legend()
-        plt.savefig(filename + ".png")
+        plt.savefig("Plot/Png/" + filename + ".png")
+        with open("Plot/Pickle/" + filename + ".pkl", "wb") as f:
+            pickle.dump(plot, f)
         plt.show()
         plt.close()
 
@@ -296,21 +298,19 @@ class Network:
         store_gradient.reverse()
         return store_gradient
 
-    def backpropagation_batch(self, X, y,regression = True, batches_number=100,eta=0.1, lambda_tikonov=0,alpha=0, validation = None,plot=False):
+    def backpropagation_batch(self, X, y,regression = True, batches_number=100, eta=0.1, lambda_tikonov=0, alpha=0, validation = None, plot=False):
         errors = []
-        validation_errors=[]
+        validation_errors = []
         for i in range(batches_number):
             if regression:
                 errors.append(self.LMS_regression(X, y))
             else: 
-                errors.append(self.LMS_classification(X, y))
-            
+                errors.append(self.LMS_classification(X, y))    
             if validation:
                 if regression:
-                    validation_errors.append(self.LMS_regression(validation[0],validation[1]))
+                    validation_errors.append(self.LMS_regression(validation[0], validation[1]))
                 else: 
-                    validation_errors.append(self.LMS_classification(validation[0],validation[1]))
-                
+                    validation_errors.append(self.LMS_classification(validation[0], validation[1]))
             #inizializzo la matrice che conterrà la somma di tutte le matrici store_gradient per ogni hidden layer
             batch_gradient = [[np.zeros((self.hidden_layers[i].neurons, self.hidden_layers[i].weights)) for i in range(self.depth)]for i in range(2)]
             #aggiungo l'ultimo pezzo di batch_gradient che conterrà la somma di tutti i gradienti per l'output layer
@@ -331,7 +331,6 @@ class Network:
             for i in range(self.depth):
                 self.hidden_layers[i].weight_matrix += (batch_gradient[0][i] * eta) - batch_gradient[1][i]
             self.output_layer.weight_matrix += (batch_gradient[0][self.depth] * eta) - batch_gradient[1][-1]
-
         if plot:
             self.plot(errors, "training_error")
             if validation: 

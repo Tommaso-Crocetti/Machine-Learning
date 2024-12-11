@@ -1,11 +1,10 @@
-from Neural_Network import *
+import pandas as pd
+from NN.Neural_Network import *
 
 def main():
 
-
-    
-    monk_s_problems = pd.read_csv("./monks-3.train",sep = "\s+", header=None) 
-    test_set = pd.read_csv("./monks-3.test", sep = "\s+", header=None)
+    monk_s_problems = pd.read_csv("Dataset/Monk/monks-3.train",sep = "\s+", header=None) 
+    test_set = pd.read_csv("Dataset/Monk/monks-3.test", sep = "\s+", header=None)
 
     # data (as pandas dataframes) 
     n_colonne = monk_s_problems.shape[1]
@@ -31,8 +30,6 @@ def main():
     print(network.LMS_classification(X_encoded, y))
 
     #network.plot_from([1,1,1,1,1,1,1,1,1,1,1,1])
-
-
 
 if __name__ == "__main__":
     main()
