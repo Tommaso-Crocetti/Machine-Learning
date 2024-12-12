@@ -224,7 +224,7 @@ class Network:
         store_output_delta = []
         #calcolo del delta dell'output layer (in questo caso della singola output unit)
         for i in range(self.output_layer.neurons):
-            store_output_delta.append((y[i] - output[i]) * self.output_layer.der_act(self.store_hidden_result[self.depth-1])[i])
+            store_output_delta.append((y.iloc[i] - output[i]) * self.output_layer.der_act(self.store_hidden_result[self.depth-1])[i])
         #inizializzione della matrice contenente i grandienti dei pesi dell'output layer
         current_matrix = np.zeros((self.output_layer.neurons, self.output_layer.weights))
         #aggiungo il risultato del bias al vettore degli output dell'ultimo hidden layer
@@ -248,10 +248,12 @@ class Network:
             for index_neuron in range(current_hidden_layer.neurons):
                 #calcolo il prodotto scalare tra il vettore contenente il delta del layer più a destra e il vettore contenente i pesi 
                 #di ogni neurone del layer più a destra che li collegano all'index_neuronesimo neurone
-                counter = np.dot(store_output_delta[0], self.output_layer.weight_matrix[:,index_neuron + 1])
+                for i in self.output_layer.neurons:
+                    counter = np.dot(store_output_delta[i], self.output_layer.weight_matrix[:,index_neuron + 1])
                 #aggiungo alla matrice contenente i delta del layer corrente il prodotto di counter e la derivata della funzione di attivazione
                 #applicata alla net delle uscite dei neuroni precedenti
-                store_current_hidden_layer_delta[index_neuron] = counter * current_hidden_layer.der_act(x)[index_neuron]
+                for i in self.output_layer.neurons: 
+                    store_current_hidden_layer_delta[index_neuron] = counter[i] * current_hidden_layer.der_act(x)[index_neuron]
                 #itero sui pesi dei singoli nueroni del layer corrente
                 for j in range(current_hidden_layer.weights):
                     #aggiungo alla matrice il prodotto del delta del neurone corrente per l'uscita del j-esimo neurone

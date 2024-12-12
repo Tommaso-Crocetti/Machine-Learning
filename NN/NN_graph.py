@@ -24,7 +24,11 @@ def plot_neural_network(network, input, output):
             node_sizes [node_id_minus_one] = 500
             node_labels[node_id_minus_one] = "1.00"
             node_colors[node_id_minus_one] = "yellow"
-            pos[node_id_minus_one] = (layer / 2, -np.max(layers)-2)
+            max_next_layers = np.max(layers[1:])
+            if layers[0] - 1 > (max_next_layers - 1) * 4:
+                pos[node_id_minus_one] = (layer / 2, -(layers[0] + 2))
+            else:
+                pos[node_id_minus_one] = (layer / 2, -(max_next_layers * 2) - max_next_layers*2)
         
         for unit in range(n_units):
             node_id = f"L{layer}_N{unit}"
@@ -42,8 +46,8 @@ def plot_neural_network(network, input, output):
                 node_labels[node_id] = f"{network.store_hidden_result[layer-1][unit]:.2f}"  
                 node_colors[node_id] = "green"
             else:
-                y_offset = -(n_units/2)
-                pos[node_id] = (layer / 2, y_offset + 4*unit)
+                y_offset = -(8*(n_units-1))/2
+                pos[node_id] = (layer / 2, y_offset + 8*unit)
                 node_sizes [node_id] = 1500
                 node_labels[node_id] = f"{output[0]:.2f}"
                 node_colors[node_id] = "green"

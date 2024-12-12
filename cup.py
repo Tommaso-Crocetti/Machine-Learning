@@ -11,12 +11,15 @@ cup_data.columns = colonne
 X = cup_data.drop(columns=["datanumber", 'target_x', 'target_y', 'target_z'])
 y = cup_data[["target_x", "target_y", "target_z"]]
 
-network = Network(0.25, 3, X.shape[1], [3,3,3,3], [Relu(), Relu(), Relu(), Id()])
+X_stand = (X - X.mean()) / X.std()
 
-#network.plot_from([1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1])
 
-network.backpropagation_batch(X, y, batches_number = 200, eta = 0.01, lambda_tikonov= 0.001, alpha = 0.01, plot = True)
+network = Network(0.25, 5, X.shape[1], [3,5,6,5,4,3], [Tanh(10),Tanh(10),Tanh(10),Tanh(10),Relu(),Id()])
 
-print(network.LMS_classification(X, y))
+network.plot_from([1,1,1,1,1,1,1,1,1,1,1,1])
 
-#network.plot_from([1,1,1,1,1,1,1,1,1,1,1,1])
+network.backpropagation_batch(X_stand, y, batches_number = 100, eta = 0.001, lambda_tikonov= 0.005, alpha = 0.001, plot = True)
+
+print(f"{round(network.LMS_regression(X_stand, y, True)/2.5, 2)}%")
+
+network.plot_from([1,1,1,1,1,1,1,1,1,1,1,1])
