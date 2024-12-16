@@ -91,7 +91,7 @@ class Layer:
             self.weight_matrix = np.eye(neurons)
         else:
             self.weights = weights + 1
-            self.weight_matrix = (np.random.random((self.neurons, self.weights)) - 0.5) *  weight_scaling
+            self.weight_matrix = (np.random.uniform(-weight_scaling, weight_scaling, (self.neurons, self.weights)))
 
     def net(self, o):
         if self.type != Type.INPUT:
@@ -111,16 +111,16 @@ class Network:
     def __init__(self, weigth_scaling, hidden_layers_number, input_dimension, layer_length, activation_class_arr):
         self.depth = hidden_layers_number
         self.store_hidden_result = [] 
-        self.input_layer = Layer(input_dimension, input_dimension, Id(), Type.INPUT, weigth_scaling)
+        self.input_layer = Layer(input_dimension, input_dimension, Id(), Type.INPUT)
         self.hidden_layers = np.empty(self.depth, dtype=object)
-        self.hidden_layers[0] = Layer(layer_length[0], input_dimension, activation_class_arr[0], Type.HIDDEN)
+        self.hidden_layers[0] = Layer(layer_length[0], input_dimension, activation_class_arr[0], Type.HIDDEN, weigth_scaling)
         self.store_hidden_result.append(np.zeros(self.hidden_layers[0].neurons))
         for i in range(hidden_layers_number - 1):
-            self.hidden_layers[i + 1] = Layer(layer_length[i + 1], self.hidden_layers[i].neurons, activation_class_arr[i + 1], Type.HIDDEN)
+            self.hidden_layers[i + 1] = Layer(layer_length[i + 1], self.hidden_layers[i].neurons, activation_class_arr[i + 1], Type.HIDDEN, weigth_scaling)
             self.store_hidden_result.append(np.zeros(self.hidden_layers[i + 1].neurons))
-        self.output_layer = Layer(layer_length[hidden_layers_number], self.hidden_layers[hidden_layers_number - 1].neurons, activation_class_arr[hidden_layers_number], Type.OUTPUT)
+        self.output_layer = Layer(layer_length[hidden_layers_number], self.hidden_layers[hidden_layers_number - 1].neurons, activation_class_arr[hidden_layers_number], Type.OUTPUT, weigth_scaling)
 
-    def plot(self, errors, filename):
+    def plot_error(self, errors, filename):
         plot = plt.figure(figsize=(8, 6))
         plt.plot(range(len(errors)), errors, marker='o', label='Errore LMS')
         plt.title("Curva dell'Errore LMS all'aumentare delle epoche")
@@ -133,11 +133,25 @@ class Network:
             pickle.dump(plot, f)
         plt.show()
         plt.close()
+    
+    def plot_target(self, y, filename):
+        fig = plt.figure(figsize=(10, 7))
+        ax = fig.add_subplot(111, projection='3d')  # Grafico 3D
+
+        # Plot dei punti
+        ax.scatter(y['target_x'], y['target_y'], y['target_z'], c='red', marker='o', s=50)  # Scatter plot
+
+        # Personalizzazione
+        ax.set_title('Punti 3D da Dataset Pandas')
+        ax.set_xlabel('Asse X')
+        ax.set_ylabel('Asse Y')
+        ax.set_zlabel('Asse Z')
+
+        # Mostra il grafico
+        plt.show()
 
     def plot_from(self,x):
         result = self.network_output(x)
-        #sotto considero l'array di result perché per ora il result è un solo valore, poi sarà
-        #un array di valori    
         plot_neural_network(self, x, result)
 
     def network_output(self, input):
@@ -147,16 +161,28 @@ class Network:
             self.store_hidden_result[i + 1] = self.hidden_layers[i + 1].act(self.store_hidden_result[i])
         return self.output_layer.act(self.store_hidden_result[self.depth - 1])
     
+    def plot_output(self, X, filename):
+        df = pd.DataFrame(columns=['target_x', 'target_y', 'target_z'])
+        for i in range(len(X)):
+            output = self.network_output(X.iloc[i])
+            df = df._append({
+                'target_x': output[0],
+                'target_y': output[1],
+                'target_z': output[2],
+            }, ignore_index=True)
+        self.plot_target(df, "")
+
+
     #nota: LMS e backprop. tengono conto di target value monodimensionali, quindi supponiamo di avere un solo neurone di output
     def LMS_classification(self, X, y, threshold=0.5, positive=1, negative=0, mean = False):
         error = 0
-        for index, row in X.iterrows():
-            output = self.network_output(row)
+        for i in range(len(X)):
+            output = self.network_output(X.iloc[i])
             if output >= threshold:
                 discrete_output = positive
             else:
                 discrete_output = negative
-            target_value = y.iloc[index]
+            target_value = y.iloc[i]
             error += (target_value - discrete_output)**2
         if mean: 
             return (error / X.shape[0])
@@ -164,24 +190,24 @@ class Network:
     
     def LMS_regression(self,X,y, mean = False):
         error=0
-        for index, row in X.iterrows():
-            output = self.network_output(row)
-            error += np.dot(y.iloc[index] - output,y.iloc[index] - output)
-        if mean: 
+        for i in range(len(X)):
+            output = self.network_output(X.iloc[i])
+            error += np.dot(y.iloc[i] - output, y.iloc[i] - output)
+        if mean:
             return (error / X.shape[0])
         return error
 
-    def backpropagation_batch(self, X, y, regression = True, batches_number=100, eta=0.1, lambda_tikonov=0, alpha=0, validation = None, plot=False):
+    def backpropagation_batch(self, X, y, regression = True, batches_number=100, eta=0.1, lambda_tichonov=0, alpha=0, validation = None, plot=False):
         errors = []
         validation_errors = []
         for i in range(batches_number):
             if regression:
-                errors.append(self.LMS_regression(X, y))
+                errors.append(self.LMS_regression(X, y, True))
             else: 
                 errors.append(self.LMS_classification(X, y))    
             if validation:
                 if regression:
-                    validation_errors.append(self.LMS_regression(validation[0], validation[1]))
+                    validation_errors.append(self.LMS_regression(validation[0], validation[1], True))
                 else: 
                     validation_errors.append(self.LMS_classification(validation[0], validation[1]))
             #inizializzo la matrice che conterrà la somma di tutte le matrici store_gradient per ogni hidden layer
@@ -189,25 +215,25 @@ class Network:
             #aggiungo l'ultimo pezzo di batch_gradient che conterrà la somma di tutti i gradienti per l'output layer
             batch_gradient[0].append(np.zeros((self.output_layer.neurons, self.output_layer.weights)))
             batch_gradient[1].append(np.zeros((self.output_layer.neurons, self.output_layer.weights)))
-            for j in range(self.depth):
-                self.hidden_layers[j].weight_matrix += alpha*batch_gradient[0][j]
-                batch_gradient[1][j] = lambda_tikonov * self.hidden_layers[j].weight_matrix
-            batch_gradient[1][-1]= lambda_tikonov * self.output_layer.weight_matrix
-            self.output_layer.weight_matrix += alpha*batch_gradient[0][-1]
             #itero sul dataset
-            for index, row in X.iterrows():
+            for i in range(len(X)):
+                for j in range(self.depth):
+                    batch_gradient[1][j] = lambda_tichonov * self.hidden_layers[j].weight_matrix
+                    self.hidden_layers[j].weight_matrix += alpha*batch_gradient[0][j]
+                batch_gradient[1][-1] = lambda_tichonov * self.output_layer.weight_matrix
+                self.output_layer.weight_matrix += alpha*batch_gradient[0][-1]
                 #calcolo store_gradient per il pattern corrente con il suo target
-                current_gradient = self.backpropagation_iteration(row, y.iloc[index])
+                current_gradient = self.backpropagation_iteration(X.iloc[i], y.iloc[i])
                 #aggiungo il gradiente appena calcolato 
                 batch_gradient[0] = [batch_gradient[0][i] + current_gradient[i] for i in range(self.depth + 1)]
             #per ogni hidden layer aggiorno i pesi sommando la matrice batch
             for i in range(self.depth):
-                self.hidden_layers[i].weight_matrix += (batch_gradient[0][i] * eta) - batch_gradient[1][i]
-            self.output_layer.weight_matrix += (batch_gradient[0][self.depth] * eta) - batch_gradient[1][-1]
+                self.hidden_layers[i].weight_matrix += (batch_gradient[0][i] * eta / len(X)) - batch_gradient[1][i]
+            self.output_layer.weight_matrix += (batch_gradient[0][self.depth] * eta / len(X)) - batch_gradient[1][-1]
         if plot:
-            self.plot(errors, "training_error")
+            self.plot_error(errors, "training_error")
             if validation: 
-                self.plot(validation_errors, "validation_error")
+                self.plot_error(validation_errors, "validation_error")
             
     def backpropagation_online(self, X, y):
         for index, row in X.iterrows():
@@ -248,12 +274,10 @@ class Network:
             for index_neuron in range(current_hidden_layer.neurons):
                 #calcolo il prodotto scalare tra il vettore contenente il delta del layer più a destra e il vettore contenente i pesi 
                 #di ogni neurone del layer più a destra che li collegano all'index_neuronesimo neurone
-                for i in self.output_layer.neurons:
-                    counter = np.dot(store_output_delta[i], self.output_layer.weight_matrix[:,index_neuron + 1])
+                counter = np.dot(store_output_delta[0], self.output_layer.weight_matrix[:,index_neuron + 1])
                 #aggiungo alla matrice contenente i delta del layer corrente il prodotto di counter e la derivata della funzione di attivazione
                 #applicata alla net delle uscite dei neuroni precedenti
-                for i in self.output_layer.neurons: 
-                    store_current_hidden_layer_delta[index_neuron] = counter[i] * current_hidden_layer.der_act(x)[index_neuron]
+                store_current_hidden_layer_delta[index_neuron] = counter * current_hidden_layer.der_act(x)[index_neuron]
                 #itero sui pesi dei singoli nueroni del layer corrente
                 for j in range(current_hidden_layer.weights):
                     #aggiungo alla matrice il prodotto del delta del neurone corrente per l'uscita del j-esimo neurone

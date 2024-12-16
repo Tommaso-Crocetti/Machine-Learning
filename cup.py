@@ -13,13 +13,24 @@ y = cup_data[["target_x", "target_y", "target_z"]]
 
 X_stand = (X - X.mean()) / X.std()
 
+train_size = int(0.33 * len(X_stand))
+X_train = X_stand.iloc[:train_size]
+y_train = y.iloc[:train_size]
+X_test = X_stand.iloc[train_size:]
+y_test = y.iloc[train_size:]
 
-network = Network(0.25, 5, X.shape[1], [3,5,6,5,4,3], [Tanh(10),Tanh(10),Tanh(10),Tanh(10),Relu(),Id()])
+network = Network(0.25, 3, X.shape[1], [5, 5, 5, 3], [Relu(), Relu(), Relu(), Id()])
 
-network.plot_from([1,1,1,1,1,1,1,1,1,1,1,1])
+#network.plot_from([1,1,1,1,1,1,1,1,1,1,1,1])
 
-network.backpropagation_batch(X_stand, y, batches_number = 100, eta = 0.001, lambda_tikonov= 0.005, alpha = 0.001, plot = True)
+#network.plot_target(y, "")
 
-print(f"{round(network.LMS_regression(X_stand, y, True)/2.5, 2)}%")
+network.backpropagation_batch(X_train, y_train, batches_number = 300, eta = 0.001, lambda_tichonov = 0.05, alpha = 0.0001, validation=[X_test, y_test], plot = True)
+                              
+print(f"{network.LMS_regression(X_train, y_train, True)}")
+
+print(f"{network.LMS_regression(X_test, y_test, True)}")
+
+network.plot_output(X, "")
 
 network.plot_from([1,1,1,1,1,1,1,1,1,1,1,1])
