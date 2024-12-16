@@ -8,7 +8,6 @@ import pandas as pd
 from ucimlrepo import fetch_ucirepo
 import pickle
 
-
 class Function(ABC):
     
     @abstractmethod
@@ -40,7 +39,7 @@ class Relu(Function):
 
     def derivate(self):
         def relu_der(x):
-            if (x<0): return 0
+            if (x < 0): return 0
             return 1
         return relu_der
 
@@ -185,7 +184,7 @@ class Network:
             target_value = y.iloc[i]
             error += (target_value - discrete_output)**2
         if mean: 
-            return (error / X.shape[0])
+            return (error / len(X))
         return error
     
     def LMS_regression(self,X,y, mean = False):
@@ -194,13 +193,28 @@ class Network:
             output = self.network_output(X.iloc[i])
             error += np.dot(y.iloc[i] - output, y.iloc[i] - output)
         if mean:
-            return (error / X.shape[0])
+            return (error / len(X))
+        return error
+    
+    def LED_regression(self, X, y, mean = False):
+        error = 0
+        for i in range(len(X)):
+            output = self.network_output(X.iloc[i])
+            error += np.sqrt(np.dot((y.iloc[i] - output), (y.iloc[i] - output)))
+        if mean:
+            return (error / len(X))
         return error
 
     def backpropagation_batch(self, X, y, regression = True, batches_number=100, eta=0.1, lambda_tichonov=0, alpha=0, validation = None, plot=False):
         errors = []
         validation_errors = []
+        #inizializzo la matrice che conterrà la somma di tutte le matrici store_gradient per ogni hidden layer
+        batch_gradient = [[np.zeros((self.hidden_layers[i].neurons, self.hidden_layers[i].weights)) for i in range(self.depth)]for i in range(2)]
+        #aggiungo l'ultimo pezzo di batch_gradient che conterrà la somma di tutti i gradienti per l'output layer
+        batch_gradient[0].append(np.zeros((self.output_layer.neurons, self.output_layer.weights)))
+        batch_gradient[1].append(np.zeros((self.output_layer.neurons, self.output_layer.weights)))
         for i in range(batches_number):
+            print(f"Iterazione {i}")
             if regression:
                 errors.append(self.LMS_regression(X, y, True))
             else: 
@@ -210,18 +224,13 @@ class Network:
                     validation_errors.append(self.LMS_regression(validation[0], validation[1], True))
                 else: 
                     validation_errors.append(self.LMS_classification(validation[0], validation[1]))
-            #inizializzo la matrice che conterrà la somma di tutte le matrici store_gradient per ogni hidden layer
-            batch_gradient = [[np.zeros((self.hidden_layers[i].neurons, self.hidden_layers[i].weights)) for i in range(self.depth)]for i in range(2)]
-            #aggiungo l'ultimo pezzo di batch_gradient che conterrà la somma di tutti i gradienti per l'output layer
-            batch_gradient[0].append(np.zeros((self.output_layer.neurons, self.output_layer.weights)))
-            batch_gradient[1].append(np.zeros((self.output_layer.neurons, self.output_layer.weights)))
             #itero sul dataset
+            for j in range(self.depth):
+                batch_gradient[1][j] = lambda_tichonov * self.hidden_layers[j].weight_matrix
+                self.hidden_layers[j].weight_matrix += alpha * batch_gradient[0][j]
+            batch_gradient[1][-1] = lambda_tichonov * self.output_layer.weight_matrix
+            self.output_layer.weight_matrix += alpha * batch_gradient[0][-1]
             for i in range(len(X)):
-                for j in range(self.depth):
-                    batch_gradient[1][j] = lambda_tichonov * self.hidden_layers[j].weight_matrix
-                    self.hidden_layers[j].weight_matrix += alpha*batch_gradient[0][j]
-                batch_gradient[1][-1] = lambda_tichonov * self.output_layer.weight_matrix
-                self.output_layer.weight_matrix += alpha*batch_gradient[0][-1]
                 #calcolo store_gradient per il pattern corrente con il suo target
                 current_gradient = self.backpropagation_iteration(X.iloc[i], y.iloc[i])
                 #aggiungo il gradiente appena calcolato 
