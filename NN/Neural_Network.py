@@ -39,6 +39,9 @@ class Relu(Function):
 
     def derivate(self):
         def relu_der(x):
+            if np.isnan(x).any() or np.isinf(x).any():
+                print("Valori non validi rilevati:", x)
+                raise ValueError("Input contiene NaN o inf")
             if (x < 0): return 0
             return 1
         return relu_der
@@ -105,7 +108,6 @@ class Layer:
         f = np.vectorize(self.activation_derivate)
         return f(self.net(o))
 
-
 class Network:
 
     def __init__(self, weigth_scaling, hidden_layers_number, input_dimension, layer_length, activation_class_arr):
@@ -119,6 +121,12 @@ class Network:
             self.hidden_layers[i + 1] = Layer(layer_length[i + 1], self.hidden_layers[i].neurons, activation_class_arr[i + 1], Type.HIDDEN, weigth_scaling)
             self.store_hidden_result.append(np.zeros(self.hidden_layers[i + 1].neurons))
         self.output_layer = Layer(layer_length[hidden_layers_number], self.hidden_layers[hidden_layers_number - 1].neurons, activation_class_arr[hidden_layers_number], Type.OUTPUT, weigth_scaling)
+
+    def reset(self, weight_scaling = 0.5):
+        for i in range(self.depth):
+            current_hidden_layer = self.hidden_layers[i]
+            current_hidden_layer.weight_matrix = (np.random.uniform(-weight_scaling, weight_scaling, (current_hidden_layer.neurons, current_hidden_layer.weights)))
+        self.output_layer.weight_matrix = (np.random.uniform(-weight_scaling, weight_scaling, (self.output_layer.neurons, self.output_layer.weights)))
 
     def plot_error(self, errors, filename):
         plot = plt.figure(figsize=(8, 6))
@@ -230,8 +238,8 @@ class Network:
             #itero sul dataset
             for j in range(self.depth):
                 batch_gradient[1][j] = lambda_tichonov * self.hidden_layers[j].weight_matrix
-                self.hidden_layers[j].weight_matrix += alpha * batch_gradient[0][j]
-            self.output_layer.weight_matrix += alpha * batch_gradient[0][-1]
+                self.hidden_layers[j].weight_matrix += (alpha / len(X) * batch_gradient[0][j])
+            self.output_layer.weight_matrix += (alpha / len(X) * batch_gradient[0][-1])
             batch_gradient[0] = self.backpropagation_iteration(X.iloc[0], y.iloc[0])
             for i in range(1, len(X)):
                 #calcolo store_gradient per il pattern corrente con il suo target
@@ -354,3 +362,36 @@ class Network:
         # e dopo i gradienti dell'output layer 
         store_gradient.reverse()
         return store_gradient
+
+def grid_search(training_data, validation_data, activation_function, max_layer_size = 7, hidden_units = [5, 50], eta = [0, 0.5], lambda_tichonov = [0, 0.5], alpha = [0, 0.5]):
+    hidden_units_range = np.linspace(hidden_units[0], hidden_units[1], hidden_units[1] // hidden_units[0])
+    eta_range = np.linspace(eta[0], eta[1], 3)
+    lambda_tichonov_range = np.linspace(lambda_tichonov[0], lambda_tichonov[1], 3)
+    alpha_range = np.linspace(alpha[0], alpha[1], 3)
+    best_model = [0, 0, 0, 0]
+    best_validation_error = np.inf
+    for current_hidden_units_number in hidden_units_range:
+        hidden_layer_number = (int(current_hidden_units_number) // max_layer_size) + 1
+        hidden_layer_units = [hidden_units[0]]
+        for i in range(hidden_layer_number // 2):
+            hidden_layer_units.append(min(hidden_layer_units[-1] + 1, max_layer_size))
+        for i in range(hidden_layer_number // 2, hidden_layer_number - 1):
+            hidden_layer_units.append(max(hidden_layer_units[-1] - 1, training_data[1].shape[1]))
+        hidden_layer_units.append(training_data[1].shape[1])
+        hidden_activation_function = [activation_function] * hidden_layer_number
+        hidden_activation_function.append(Id())
+        current_model = Network(0.5, hidden_layer_number, training_data[0].shape[1], hidden_layer_units, hidden_activation_function)
+        for current_eta in eta_range:
+            for current_lambda_tichonov in lambda_tichonov_range:
+                for current_alpha in alpha_range:
+                    print(f"Numero di neuroni: {current_hidden_units_number}")
+                    print(f"Eta: {current_eta}")
+                    print(f"Lambda: {current_lambda_tichonov}")
+                    print(f"Alpha: {current_alpha}")
+                    current_model.backpropagation_batch(training_data[0], training_data[1], eta = current_eta, lambda_tichonov=current_lambda_tichonov, alpha = current_alpha, validation = validation_data)
+                    current_validation_error = current_model.LED_regression(validation_data[0], validation_data[1], mean=True)
+                    if current_validation_error < best_validation_error:
+                        best_model = [current_hidden_units_number, current_eta, current_lambda_tichonov, current_alpha]
+                        best_validation_error = current_validation_error
+                    current_model.reset()
+    return best_model, best_validation_error
