@@ -105,6 +105,7 @@ class Layer:
         f = np.vectorize(self.activation_derivate)
         return f(self.net(o))
 
+
 class Network:
 
     def __init__(self, weigth_scaling, hidden_layers_number, input_dimension, layer_length, activation_class_arr):
@@ -146,8 +147,22 @@ class Network:
         ax.set_ylabel('Asse Y')
         ax.set_zlabel('Asse Z')
 
+        ax.set_xlim([-2, 2])
+        ax.set_ylim([-2, 2])
+        ax.set_zlim([-10, 25])
         # Mostra il grafico
         plt.show()
+    
+    def plot_output(self, X, filename):
+        data = []
+        for i in range(len(X)):
+            output = self.network_output(X.iloc[i])
+            data.append({
+                'target_x': output[0],
+                'target_y': output[1],
+                'target_z': output[2],
+            })
+        self.plot_target(pd.DataFrame(data), "")
 
     def plot_from(self,x):
         result = self.network_output(x)
@@ -159,18 +174,6 @@ class Network:
         for i in range(self.depth-1):
             self.store_hidden_result[i + 1] = self.hidden_layers[i + 1].act(self.store_hidden_result[i])
         return self.output_layer.act(self.store_hidden_result[self.depth - 1])
-    
-    def plot_output(self, X, filename):
-        df = pd.DataFrame(columns=['target_x', 'target_y', 'target_z'])
-        for i in range(len(X)):
-            output = self.network_output(X.iloc[i])
-            df = df._append({
-                'target_x': output[0],
-                'target_y': output[1],
-                'target_z': output[2],
-            }, ignore_index=True)
-        self.plot_target(df, "")
-
 
     #nota: LMS e backprop. tengono conto di target value monodimensionali, quindi supponiamo di avere un solo neurone di output
     def LMS_classification(self, X, y, threshold=0.5, positive=1, negative=0, mean = False):
@@ -205,7 +208,7 @@ class Network:
             return (error / len(X))
         return error
 
-    def backpropagation_batch(self, X, y, regression = True, batches_number=100, eta=0.1, lambda_tichonov=0, alpha=0, validation = None, plot=False):
+    def backpropagation_batch(self, X, y, regression = True, batches_number = 100, eta = 0.1, lambda_tichonov=0, alpha=0, validation = None, plot=False):
         errors = []
         validation_errors = []
         #inizializzo la matrice che conterrà la somma di tutte le matrici store_gradient per ogni hidden layer
@@ -216,21 +219,21 @@ class Network:
         for i in range(batches_number):
             print(f"Iterazione {i}")
             if regression:
-                errors.append(self.LMS_regression(X, y, True))
+                errors.append(self.LED_regression(X, y, True))
             else: 
                 errors.append(self.LMS_classification(X, y))    
             if validation:
                 if regression:
-                    validation_errors.append(self.LMS_regression(validation[0], validation[1], True))
+                    validation_errors.append(self.LED_regression(validation[0], validation[1], True))
                 else: 
                     validation_errors.append(self.LMS_classification(validation[0], validation[1]))
             #itero sul dataset
             for j in range(self.depth):
                 batch_gradient[1][j] = lambda_tichonov * self.hidden_layers[j].weight_matrix
                 self.hidden_layers[j].weight_matrix += alpha * batch_gradient[0][j]
-            batch_gradient[1][-1] = lambda_tichonov * self.output_layer.weight_matrix
             self.output_layer.weight_matrix += alpha * batch_gradient[0][-1]
-            for i in range(len(X)):
+            batch_gradient[0] = self.backpropagation_iteration(X.iloc[0], y.iloc[0])
+            for i in range(1, len(X)):
                 #calcolo store_gradient per il pattern corrente con il suo target
                 current_gradient = self.backpropagation_iteration(X.iloc[i], y.iloc[i])
                 #aggiungo il gradiente appena calcolato 
@@ -258,41 +261,30 @@ class Network:
         store_gradient = []
         store_output_delta = []
         #calcolo del delta dell'output layer (in questo caso della singola output unit)
-        for i in range(self.output_layer.neurons):
-            store_output_delta.append((y.iloc[i] - output[i]) * self.output_layer.der_act(self.store_hidden_result[self.depth-1])[i])
+        output_layer_der = self.output_layer.der_act(self.store_hidden_result[-1])
+        store_output_delta = (y - output) * output_layer_der
         #inizializzione della matrice contenente i grandienti dei pesi dell'output layer
-        current_matrix = np.zeros((self.output_layer.neurons, self.output_layer.weights))
         #aggiungo il risultato del bias al vettore degli output dell'ultimo hidden layer
         updated_hidden_result = np.concatenate((np.array([1]), self.store_hidden_result[self.depth - 1]))
         #inizio a iterare sugli output neruons
-        for i in range(self.output_layer.neurons):
-            #itero sui pesi dei singoli output neurons
-            for j in range(self.output_layer.weights):
-                #riempimento della matrice con i gradienti peso per peso 
-                current_matrix[i][j] = store_output_delta[i] * updated_hidden_result[j]
         #aggiunta alla matrice totale dei gradienti la matrice dei gradienti dell'output layer
-        store_gradient.append(current_matrix)
+        store_gradient.append(np.outer(store_output_delta, updated_hidden_result))
 
         if (self.depth == 1):
             current_hidden_layer = self.hidden_layers[0]
             store_current_hidden_layer_delta = np.zeros(current_hidden_layer.neurons)
             #inizializzo la matrice che conterrà i gradienti dei pesi dell' hidden layer più vicino all'output layer
-            current_matrix = np.zeros((current_hidden_layer.neurons, current_hidden_layer.weights))
             updated_hidden_result = np.concatenate((np.array([1]), x))
             #itero sui neuroni del layer corrente
+            current_hidden_layer_der = current_hidden_layer.der_act(x)
             for index_neuron in range(current_hidden_layer.neurons):
                 #calcolo il prodotto scalare tra il vettore contenente il delta del layer più a destra e il vettore contenente i pesi 
                 #di ogni neurone del layer più a destra che li collegano all'index_neuronesimo neurone
-                counter = np.dot(store_output_delta[0], self.output_layer.weight_matrix[:,index_neuron + 1])
                 #aggiungo alla matrice contenente i delta del layer corrente il prodotto di counter e la derivata della funzione di attivazione
                 #applicata alla net delle uscite dei neuroni precedenti
-                store_current_hidden_layer_delta[index_neuron] = counter * current_hidden_layer.der_act(x)[index_neuron]
+                store_current_hidden_layer_delta[index_neuron] = np.dot(store_output_delta, self.output_layer.weight_matrix[:,index_neuron + 1]) * current_hidden_layer_der[index_neuron]
                 #itero sui pesi dei singoli nueroni del layer corrente
-                for j in range(current_hidden_layer.weights):
-                    #aggiungo alla matrice il prodotto del delta del neurone corrente per l'uscita del j-esimo neurone
-                    current_matrix[index_neuron][j] = store_current_hidden_layer_delta[index_neuron] * updated_hidden_result[j]
-                #aggiungo la matrice appena calcolata alla matrice totale
-            store_gradient.append(current_matrix)
+            store_gradient.append(np.outer(store_current_hidden_layer_delta, updated_hidden_result))
             #inverto l'ordine della matrice contenente i gradienti di ogni peso in modo da avere prima i gradienti del primo hidden layer
             # e dopo i gradienti dell'output layer 
             store_gradient.reverse()
@@ -303,21 +295,16 @@ class Network:
         #inizializzo il vettore contenente i delta dell' hidden layer più vicino all'output layer
         store_current_hidden_layer_delta = np.zeros(current_hidden_layer.neurons)
         #inizializzo la matrice che conterrà i gradienti dei pesi dell' hidden layer più vicino all'output layer
-        current_matrix = np.zeros((current_hidden_layer.neurons, current_hidden_layer.weights))
         #aggiungo il bias
         updated_hidden_result = np.concatenate((np.array([1]), self.store_hidden_result[self.depth - 2]))
         #itero sui neuroni del layer
-        for output_index in range(self.output_layer.neurons):
-            for index_neuron in range(current_hidden_layer.neurons):
-                #nella matrice contenente i delta di questo layer metto il prodotto del delta dell'output layer (in questo caso un solo neurone) 
-                #per il peso che va da index_neuron all'output neuron per la derivata della funzione di attivazione applicata alla net del neurone
-                store_current_hidden_layer_delta[index_neuron] = np.dot(store_output_delta, self.output_layer.weight_matrix[:,index_neuron+1]) * (current_hidden_layer.der_act(self.store_hidden_result[self.depth - 2])[index_neuron])
-                #itero sul numero di pesi del layer corrente
-                for j in range(current_hidden_layer.weights):
-                    #aggiungo il prodotto del delta del index_neuron per il risultato del j-esimo neurone al layer precedente (quello verso l'input layer)
-                    current_matrix[index_neuron][j] = store_current_hidden_layer_delta[index_neuron] * updated_hidden_result[j]
-                #aggiungo la matrice totale con l'aggiornamento dei pesi di questo layer
-        store_gradient.append(current_matrix)
+        current_hidden_layer_der = current_hidden_layer.der_act(self.store_hidden_result[self.depth - 2])
+        for index_neuron in range(current_hidden_layer.neurons):
+            #nella matrice contenente i delta di questo layer metto il prodotto del delta dell'output layer (in questo caso un solo neurone) 
+            #per il peso che va da index_neuron all'output neuron per la derivata della funzione di attivazione applicata alla net del neurone
+            store_current_hidden_layer_delta[index_neuron] = np.dot(store_output_delta, self.output_layer.weight_matrix[:,index_neuron+1]) * current_hidden_layer_der[index_neuron]
+            #itero sul numero di pesi del layer corrente
+        store_gradient.append(np.outer(store_current_hidden_layer_delta, updated_hidden_result))
 
         #aggiorniamo il valore del delta del prossimo layer con il valore del delta dell'ultimo hidden layer
         next_layer_delta = store_current_hidden_layer_delta
@@ -329,50 +316,40 @@ class Network:
             #inizializzo l'array che conterrà i delta dei neuroni di questo layer 
             store_current_hidden_layer_delta = np.zeros(current_hidden_layer.neurons)
             #inizializzo la matrice che conterrà gli aggiornamenti dei pesi dei neuroni di questo layer
-            current_matrix = np.zeros((current_hidden_layer.neurons, current_hidden_layer.weights))
             #aggiungo il bias ai neuroni del layer più vicino all'input layer
             updated_hidden_result = np.concatenate((np.array([1]), self.store_hidden_result[hidden_layer_index - 1]))
             #itero sul numero di neuroni di questo layer
+            current_hidden_layer_der = current_hidden_layer.der_act(self.store_hidden_result[hidden_layer_index - 1])
             for index_neuron in range(current_hidden_layer.neurons):
                 #calcolo il prodotto scalare tra il vettore dei delta dei neuroni del layer più a destra per il vettore contenente i pesi 
                 #di ogni neurone del layer più a destra che li collegano all'index_neuronesimo neurone
-                counter = np.dot(next_layer_delta, self.hidden_layers[hidden_layer_index + 1].weight_matrix[:,index_neuron + 1])
                 #calcolo il prodotto di counter per la derivata della funzione di attivazione del layer corrente applicata
                 #ai risultati del layer più a sinistra
-                store_current_hidden_layer_delta[index_neuron] = counter * (current_hidden_layer.der_act(self.store_hidden_result[hidden_layer_index - 1])[index_neuron])
+                store_current_hidden_layer_delta[index_neuron] = np.dot(next_layer_delta, self.hidden_layers[hidden_layer_index + 1].weight_matrix[:,index_neuron + 1]) * (current_hidden_layer.der_act(self.store_hidden_result[hidden_layer_index - 1])[index_neuron])
                 #itero sui singoli pesi del layer corrente
-                for j in range(current_hidden_layer.weights):
-                    #aggiungo alla matrice che contiene gli aggiornamenti dei pesi il gradiente relativo al j-esimo peso dell'index_neuresimo neurone
-                    current_matrix[index_neuron][j] = store_current_hidden_layer_delta[index_neuron] * updated_hidden_result[j]
-            
+            store_gradient.append(np.outer(store_current_hidden_layer_delta, updated_hidden_result))
             #aggiorno il next_layer_delta in modo che il delta del layer corrente valga come delta del layer successivo per il layer
             #che considero alla prossima iterazione 
             next_layer_delta = store_current_hidden_layer_delta
-            #aggiungo la matrice che contiene gli aggiornamenti dei pesi di questo layer alla matrice totale
-            store_gradient.append(current_matrix)
 
         #considero l'ultimo hidden layer, ossia quello a sinistra dell'input layer
         current_hidden_layer = self.hidden_layers[0]
         #inizializzo la matrice che conterrà i delta di questo layer
         store_current_hidden_layer_delta = np.zeros(current_hidden_layer.neurons)
         #inizializzo la matrice che conterrà gli aggiornamenti dei pesi di questo layer
-        current_matrix = np.zeros((current_hidden_layer.neurons, current_hidden_layer.weights))
         #aggiungo il bias ai neuroni del layer più a sinistra (l'input layer)
         updated_hidden_result = np.concatenate((np.array([1]), x))
         #itero sui neuroni del layer corrente
+        current_hidden_layer_der = current_hidden_layer.der_act(x)
         for index_neuron in range(current_hidden_layer.neurons):
             #calcolo il prodotto scalare tra il vettore contenente il delta del layer più a destra e il vettore contenente i pesi 
             #di ogni neurone del layer più a destra che li collegano all'index_neuronesimo neurone
-            counter = np.dot(next_layer_delta, self.hidden_layers[1].weight_matrix[:,index_neuron + 1])
             #aggiungo alla matrice contenente i delta del layer corrente il prodotto di counter e la derivata della funzione di attivazione
             #applicata alla net delle uscite dei neuroni precedenti
-            store_current_hidden_layer_delta[index_neuron] = counter * current_hidden_layer.der_act(x)[index_neuron]
+            store_current_hidden_layer_delta[index_neuron] = np.dot(next_layer_delta, self.hidden_layers[1].weight_matrix[:,index_neuron + 1]) * current_hidden_layer_der[index_neuron]
             #itero sui pesi dei singoli nueroni del layer corrente
-            for j in range(current_hidden_layer.weights):
-                #aggiungo alla matrice il prodotto del delta del neurone corrente per l'uscita del j-esimo neurone
-                current_matrix[index_neuron][j] = store_current_hidden_layer_delta[index_neuron] * updated_hidden_result[j]
             #aggiungo la matrice appena calcolata alla matrice totale
-        store_gradient.append(current_matrix)
+        store_gradient.append(np.outer(store_current_hidden_layer_delta, updated_hidden_result))
         #inverto l'ordine della matrice contenente i gradienti di ogni peso in modo da avere prima i gradienti del primo hidden layer
         # e dopo i gradienti dell'output layer 
         store_gradient.reverse()

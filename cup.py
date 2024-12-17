@@ -20,11 +20,14 @@ y_train = y.iloc[:train_size]
 X_test = X_stand.iloc[train_size:]
 y_test = y.iloc[train_size:]
 
-network = Network(0.5, 3, X.shape[1], [5, 5, 5, 3], [Tanh(0.1), Tanh(0.1), Tanh(0.1), Id()])
+network = Network(0.25, 4, X.shape[1], [5, 6, 6, 5, 3], [Tanh(0.1), Tanh(0.1), Tanh(0.1), Tanh(0.1), Id()])
 
 #network.plot_target(y, "")
 
-network.backpropagation_batch(X_train, y_train, batches_number = 300, eta = 0.025, lambda_tichonov = 0.05, alpha = 0, validation = [X_test, y_test], plot = True)
+network.backpropagation_batch(X_train, y_train, batches_number = 300, eta = 0.05, lambda_tichonov = 0.00125, alpha = 0, validation = [X_test, y_test], plot = True)
+
+for i in range(len(X)):
+    print(network.network_output(X.iloc[i]))
 
 print(f"{network.LMS_regression(X_train, y_train, True)}")
 
