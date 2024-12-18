@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from enum import Enum
 import numpy as np
+import networkx as nx
 import math
 from NN.NN_graph import plot_neural_network
 import matplotlib.pyplot as plt
@@ -39,9 +40,6 @@ class Relu(Function):
 
     def derivate(self):
         def relu_der(x):
-            if np.isnan(x).any() or np.isinf(x).any():
-                print("Valori non validi rilevati:", x)
-                raise ValueError("Input contiene NaN o inf")
             if (x < 0): return 0
             return 1
         return relu_der
@@ -128,40 +126,21 @@ class Network:
             current_hidden_layer.weight_matrix = (np.random.uniform(-weight_scaling, weight_scaling, (current_hidden_layer.neurons, current_hidden_layer.weights)))
         self.output_layer.weight_matrix = (np.random.uniform(-weight_scaling, weight_scaling, (self.output_layer.neurons, self.output_layer.weights)))
 
-    def plot_error(self, errors, filename):
+    def plot_error(self, errors, validation_errors, filename):
         plot = plt.figure(figsize=(8, 6))
-        plt.plot(range(len(errors)), errors, marker='o', label='Errore LMS')
-        plt.title("Curva dell'Errore LMS all'aumentare delle epoche")
+        plt.plot(range(len(errors)), errors, c = "blue", label = 'Training error')
+        plt.plot(range(len(validation_errors)), validation_errors, c = "red", label = "Validation error")
+        plt.title("Curva dell'Errore LED all'aumentare delle epoche")
         plt.xlabel("Epoche")
-        plt.ylabel("Errore LMS")
-        plt.grid()
+        plt.ylabel("Errore")
         plt.legend()
         plt.savefig("Plot/Png/" + filename + ".png")
         with open("Plot/Pickle/" + filename + ".pkl", "wb") as f:
             pickle.dump(plot, f)
         plt.show()
         plt.close()
-    
-    def plot_target(self, y, filename):
-        fig = plt.figure(figsize=(10, 7))
-        ax = fig.add_subplot(111, projection='3d')  # Grafico 3D
-
-        # Plot dei punti
-        ax.scatter(y['target_x'], y['target_y'], y['target_z'], c='red', marker='o', s=50)  # Scatter plot
-
-        # Personalizzazione
-        ax.set_title('Punti 3D da Dataset Pandas')
-        ax.set_xlabel('Asse X')
-        ax.set_ylabel('Asse Y')
-        ax.set_zlabel('Asse Z')
-
-        ax.set_xlim([-2, 2])
-        ax.set_ylim([-2, 2])
-        ax.set_zlim([-10, 25])
-        # Mostra il grafico
-        plt.show()
-    
-    def plot_output(self, X, filename):
+        
+    def plot_output(self, X, y):
         data = []
         for i in range(len(X)):
             output = self.network_output(X.iloc[i])
@@ -170,11 +149,124 @@ class Network:
                 'target_y': output[1],
                 'target_z': output[2],
             })
-        self.plot_target(pd.DataFrame(data), "")
+        data = pd.DataFrame(data)
+        fig = plt.figure(figsize=(10, 7))
+        ax = fig.add_subplot(111, projection='3d')  # Grafico 3D
 
-    def plot_from(self,x):
-        result = self.network_output(x)
-        plot_neural_network(self, x, result)
+        # Plot dei punti
+        ax.scatter(y['target_x'], y['target_y'], y['target_z'], c='blue', marker='o', label="Target value", s=50)  # Scatter plot
+        ax.scatter(data['target_x'], data['target_y'], data['target_z'], c='red', marker='o', label="Network output", s=50)  # Scatter plot
+
+        plt.legend()
+
+        # Personalizzazione
+        ax.set_title('Target values & network outputs')
+        ax.set_xlabel('Asse X')
+        ax.set_ylabel('Asse Y')
+        ax.set_zlabel('Asse Z')
+
+        x_min = min(y['target_x'].min(), data['target_x'].min())
+        x_max = max(y['target_x'].max(), data['target_x'].max())
+        y_min = min(y['target_y'].min(), data['target_y'].min())
+        y_max = max(y['target_y'].max(), data['target_y'].max())
+        z_min = min(y['target_z'].min(), data['target_z'].min())
+        z_max = max(y['target_z'].max(), data['target_z'].max())
+
+        ax.set_xlim([x_min, x_max])
+        ax.set_ylim([y_min, y_max])
+        ax.set_zlim([z_min, z_max])
+        # Mostra il grafico
+        plt.show()
+
+    def plot(self):
+
+        def weight_to_color (x):
+            return [0, 0, 1] if x < 0 else [1, 0, 0]
+
+        #scelgo la trasparenza in base al valore assoluto del rapporto tra il peso considerato e il valore assoluto del peso massimo
+        def weight_alpha(x): 
+            alpha = np.abs(np.divide(x,1))
+            return alpha
+
+        G = nx.DiGraph()
+        layers = []
+        layers.append(self.input_layer.neurons)
+        for i in range(self.depth):
+            layers.append(self.hidden_layers[i].neurons)
+        layers.append(self.output_layer.neurons)
+
+        pos = {}
+        node_labels = {}
+        node_colors = {}
+        node_sizes = {}
+        y_offset = 0
+        
+        for layer, n_units in enumerate(layers):
+            y_offset = -(n_units/2)
+            if layer != len(layers) - 1:
+                node_id_minus_one = f"L{layer}_N{-1}"
+            G.add_node(node_id_minus_one)  
+            node_sizes [node_id_minus_one] = 500
+            node_labels[node_id_minus_one] = ""
+            node_colors[node_id_minus_one] = "yellow"
+            max_next_layers = np.max(layers[1:])
+            if layers[0] - 1 > (max_next_layers - 1) * 4:
+                pos[node_id_minus_one] = (layer / 2, -(layers[0] + 2))
+            else:
+                pos[node_id_minus_one] = (layer / 2, -(max_next_layers * 2) - max_next_layers*2)
+        
+        for unit in range(n_units):
+            node_id = f"L{layer}_N{unit}"
+            G.add_node(node_id)
+            if layer == 0:
+                y_offset = -(2*(n_units-1))/2
+                pos[node_id] = (layer / 2, y_offset + 2*unit)
+                node_sizes [node_id] = 500
+                node_labels[node_id] = ""  
+                node_colors[node_id] = "gray"
+            elif layer < len(layers)-1: 
+                y_offset = -(12*(n_units-1))/2
+                pos[node_id] = (layer / 2, y_offset + 12*unit)
+                node_sizes [node_id] = 500
+                node_labels[node_id] = ""  
+                node_colors[node_id] = "green"
+            else:
+                y_offset = -(8*(n_units-1))/2
+                pos[node_id] = (layer / 2, y_offset + 8*unit)
+                node_sizes [node_id] = 500
+                node_labels[node_id] = ""
+                node_colors[node_id] = "green"
+
+        #mette gli edge tra i neuroni
+        for layer in range(self.depth+1):
+            for src in range(-1, layers[layer]):
+                for dest in range(layers[layer + 1]):
+                    src_id = f"L{layer}_N{src}"
+                    dest_id = f"L{layer + 1}_N{dest}"
+                    if (layer < self.depth):
+                        G.add_edge(src_id, dest_id)
+                        G[src_id][dest_id]["weight"] = self.hidden_layers[layer].weight_matrix[dest][src]
+                    elif (layer == ((self.depth))):
+                        G.add_edge(src_id, dest_id)
+                        G[src_id][dest_id]["weight"] = self.output_layer.weight_matrix[dest][src]
+                        
+
+        edge_colors = []
+        for u, v in G.edges():
+            weight = G[u][v]["weight"] 
+            color = weight_to_color(weight)
+            alpha = weight_alpha(weight)
+            edge_colors.append((color[0], color[1], color[2], alpha)) 
+        
+        #disegna la figura
+        node_colors_list = np.array(list(node_colors.values()))
+        node_sizes_list = np.array(list(node_sizes.values()))
+        plt.figure(figsize=(10, 8))
+        nx.draw_networkx_nodes(G, pos, node_color=node_colors_list, node_size=node_sizes_list)
+        nx.draw_networkx_labels(G, pos, labels=node_labels, font_size=12, font_color="black")
+        nx.draw_networkx_edges(G, pos, edge_color=edge_colors, width=5, arrows=False)
+
+        plt.show()
 
     def network_output(self, input):
         current_input = self.input_layer.act(input)
@@ -225,7 +317,6 @@ class Network:
         batch_gradient[0].append(np.zeros((self.output_layer.neurons, self.output_layer.weights)))
         batch_gradient[1].append(np.zeros((self.output_layer.neurons, self.output_layer.weights)))
         for i in range(batches_number):
-            print(f"Iterazione {i}")
             if regression:
                 errors.append(self.LED_regression(X, y, True))
             else: 
@@ -251,9 +342,8 @@ class Network:
                 self.hidden_layers[i].weight_matrix += (batch_gradient[0][i] * eta / len(X)) - batch_gradient[1][i]
             self.output_layer.weight_matrix += (batch_gradient[0][self.depth] * eta / len(X)) - batch_gradient[1][-1]
         if plot:
-            self.plot_error(errors, "training_error")
-            if validation: 
-                self.plot_error(validation_errors, "validation_error")
+            self.plot_error(errors, validation_errors, "training_error")
+
             
     def backpropagation_online(self, X, y):
         for index, row in X.iterrows():
@@ -388,7 +478,7 @@ def grid_search(training_data, validation_data, activation_function, max_layer_s
                     print(f"Eta: {current_eta}")
                     print(f"Lambda: {current_lambda_tichonov}")
                     print(f"Alpha: {current_alpha}")
-                    current_model.backpropagation_batch(training_data[0], training_data[1], eta = current_eta, lambda_tichonov=current_lambda_tichonov, alpha = current_alpha, validation = validation_data)
+                    current_model.backpropagation_batch(training_data[0], training_data[1], batches_number = 100, eta = current_eta, lambda_tichonov=current_lambda_tichonov, alpha = current_alpha, validation = validation_data)
                     current_validation_error = current_model.LED_regression(validation_data[0], validation_data[1], mean=True)
                     if current_validation_error < best_validation_error:
                         best_model = [current_hidden_units_number, current_eta, current_lambda_tichonov, current_alpha]
