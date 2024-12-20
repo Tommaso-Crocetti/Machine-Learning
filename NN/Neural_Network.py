@@ -108,8 +108,9 @@ class Layer:
 
 class Network:
 
-    def __init__(self, weigth_scaling, hidden_layers_number, input_dimension, layer_length, activation_class_arr):
+    def __init__(self, weigth_scaling, hidden_layers_number, input_dimension, layer_length, activation_class_arr, TR_std_mean_arr):
         self.depth = hidden_layers_number
+        self.std_mean_arr = TR_std_mean_arr
         self.store_hidden_result = [] 
         self.input_layer = Layer(input_dimension, input_dimension, Id(), Type.INPUT)
         self.hidden_layers = np.empty(self.depth, dtype=object)
@@ -127,7 +128,7 @@ class Network:
         self.output_layer.weight_matrix = (np.random.uniform(-weight_scaling, weight_scaling, (self.output_layer.neurons, self.output_layer.weights)))
 
     def plot_error(self, errors, validation_errors, filename):
-        plot = plt.figure(figsize=(8, 6))
+        plot = plt.figure(figsize=(16, 9))
         plt.plot(range(len(errors)), errors, c = "blue", label = 'Training error')
         plt.plot(range(len(validation_errors)), validation_errors, c = "red", label = "Validation error")
         plt.title("Curva dell'Errore LED all'aumentare delle epoche")
@@ -140,17 +141,17 @@ class Network:
         plt.show()
         plt.close()
         
-    def plot_output(self, X, y):
+    def plot_output(self, X, y, title = " "):
         data = []
         for i in range(len(X)):
-            output = self.network_output(X.iloc[i])
+            output = (self.network_output(X.iloc[i])*self.std_mean_arr["y_train_std"]) + self.std_mean_arr["y_train_mean"]
             data.append({
-                'target_x': output[0],
-                'target_y': output[1],
-                'target_z': output[2],
+                'target_x': output.iloc[0],
+                'target_y': output.iloc[1],
+                'target_z': output.iloc[2],
             })
         data = pd.DataFrame(data)
-        fig = plt.figure(figsize=(10, 7))
+        fig = plt.figure(figsize=(9, 9))
         ax = fig.add_subplot(111, projection='3d')  # Grafico 3D
 
         # Plot dei punti
@@ -160,7 +161,7 @@ class Network:
         plt.legend()
 
         # Personalizzazione
-        ax.set_title('Target values & network outputs')
+        ax.set_title(title)
         ax.set_xlabel('Asse X')
         ax.set_ylabel('Asse Y')
         ax.set_zlabel('Asse Z')
@@ -176,6 +177,7 @@ class Network:
         ax.set_ylim([y_min, y_max])
         ax.set_zlim([z_min, z_max])
         # Mostra il grafico
+        plt.tight_layout()
         plt.show()
 
     def plot(self):
@@ -200,42 +202,39 @@ class Network:
         node_colors = {}
         node_sizes = {}
         y_offset = 0
+        max_layers = np.max(layers[1:])
         
         for layer, n_units in enumerate(layers):
-            y_offset = -(n_units/2)
             if layer != len(layers) - 1:
+                y_offset = -(n_units/2)
                 node_id_minus_one = f"L{layer}_N{-1}"
-            G.add_node(node_id_minus_one)  
-            node_sizes [node_id_minus_one] = 500
-            node_labels[node_id_minus_one] = ""
-            node_colors[node_id_minus_one] = "yellow"
-            max_next_layers = np.max(layers[1:])
-            if layers[0] - 1 > (max_next_layers - 1) * 4:
-                pos[node_id_minus_one] = (layer / 2, -(layers[0] + 2))
-            else:
-                pos[node_id_minus_one] = (layer / 2, -(max_next_layers * 2) - max_next_layers*2)
+                G.add_node(node_id_minus_one)  
+                node_sizes [node_id_minus_one] = 200
+                node_labels[node_id_minus_one] = " "
+                node_colors[node_id_minus_one] = "yellow"
+                pos[node_id_minus_one] = (layer / 2, - (max_layers/2+1))
         
-        for unit in range(n_units):
-            node_id = f"L{layer}_N{unit}"
-            G.add_node(node_id)
-            if layer == 0:
-                y_offset = -(2*(n_units-1))/2
-                pos[node_id] = (layer / 2, y_offset + 2*unit)
-                node_sizes [node_id] = 500
-                node_labels[node_id] = ""  
-                node_colors[node_id] = "gray"
-            elif layer < len(layers)-1: 
-                y_offset = -(12*(n_units-1))/2
-                pos[node_id] = (layer / 2, y_offset + 12*unit)
-                node_sizes [node_id] = 500
-                node_labels[node_id] = ""  
-                node_colors[node_id] = "green"
-            else:
-                y_offset = -(8*(n_units-1))/2
-                pos[node_id] = (layer / 2, y_offset + 8*unit)
-                node_sizes [node_id] = 500
-                node_labels[node_id] = ""
-                node_colors[node_id] = "green"
+            for unit in range(n_units):
+                node_id = f"L{layer}_N{unit}"
+                G.add_node(node_id)
+                if layer == 0:
+                    y_offset = -((n_units-1))/2
+                    pos[node_id] = (layer / 2, y_offset + unit)
+                    node_sizes [node_id] = 200
+                    node_labels[node_id] = " "  
+                    node_colors[node_id] = "gray"
+                elif layer < len(layers)-1: 
+                    y_offset = -((n_units-1))/2
+                    pos[node_id] = (layer / 2, y_offset + unit)
+                    node_sizes [node_id] = 200
+                    node_labels[node_id] = " "  
+                    node_colors[node_id] = "green"
+                else:
+                    y_offset = -((n_units-1))/2
+                    pos[node_id] = (layer / 2, y_offset + unit)
+                    node_sizes [node_id] = 200
+                    node_labels[node_id] = " "
+                    node_colors[node_id] = "green"
 
         #mette gli edge tra i neuroni
         for layer in range(self.depth+1):
@@ -261,10 +260,15 @@ class Network:
         #disegna la figura
         node_colors_list = np.array(list(node_colors.values()))
         node_sizes_list = np.array(list(node_sizes.values()))
-        plt.figure(figsize=(10, 8))
-        nx.draw_networkx_nodes(G, pos, node_color=node_colors_list, node_size=node_sizes_list)
+        plt.figure(figsize=(16, 10))
+        nx.draw_networkx_nodes(G, pos, node_color=node_colors_list, node_size=node_sizes_list, edgecolors="black")
         nx.draw_networkx_labels(G, pos, labels=node_labels, font_size=12, font_color="black")
-        nx.draw_networkx_edges(G, pos, edge_color=edge_colors, width=5, arrows=False)
+        nx.draw_networkx_edges(G, pos, edge_color=edge_colors, width=3, arrows=False)
+
+        plt.axis('off')
+
+        # Adatta l'aspetto della figura all'interno della finestra
+        plt.tight_layout()
 
         plt.show()
 
@@ -278,8 +282,9 @@ class Network:
     #nota: LMS e backprop. tengono conto di target value monodimensionali, quindi supponiamo di avere un solo neurone di output
     def LMS_classification(self, X, y, threshold=0.5, positive=1, negative=0, mean = False):
         error = 0
+        X_stand = self.standard(X)
         for i in range(len(X)):
-            output = self.network_output(X.iloc[i])
+            output = self.unstandard(self.network_output(X_stand.iloc[i],y))
             if output >= threshold:
                 discrete_output = positive
             else:
@@ -302,13 +307,17 @@ class Network:
     def LED_regression(self, X, y, mean = False):
         error = 0
         for i in range(len(X)):
-            output = self.network_output(X.iloc[i])
+            output = (self.network_output(X.iloc[i])*self.std_mean_arr["y_train_std"]) + self.std_mean_arr["y_train_mean"]
             error += np.sqrt(np.dot((y.iloc[i] - output), (y.iloc[i] - output)))
         if mean:
             return (error / len(X))
         return error
-
+    
     def backpropagation_batch(self, X, y, regression = True, batches_number = 100, eta = 0.1, lambda_tichonov=0, alpha=0, validation = None, plot=False):
+        X_stand = (X - self.std_mean_arr["X_train_mean"]) / self.std_mean_arr["X_train_std"]
+        y_stand = (y - self.std_mean_arr["y_train_mean"]) / self.std_mean_arr["y_train_std"]
+        if validation:
+            validation_input_stand = (validation[0]-self.std_mean_arr["X_train_mean"])/self.std_mean_arr["X_train_std"]
         errors = []
         validation_errors = []
         #inizializzo la matrice che conterrà la somma di tutte le matrici store_gradient per ogni hidden layer
@@ -317,13 +326,14 @@ class Network:
         batch_gradient[0].append(np.zeros((self.output_layer.neurons, self.output_layer.weights)))
         batch_gradient[1].append(np.zeros((self.output_layer.neurons, self.output_layer.weights)))
         for i in range(batches_number):
+            print(f"Iterazione {i}")
             if regression:
-                errors.append(self.LED_regression(X, y, True))
+                errors.append(self.LED_regression(X_stand, y, mean = True))
             else: 
-                errors.append(self.LMS_classification(X, y))    
-            if validation:
+                errors.append(self.LMS_classification(X, y))
+            if validation: 
                 if regression:
-                    validation_errors.append(self.LED_regression(validation[0], validation[1], True))
+                    validation_errors.append(self.LED_regression(validation_input_stand, validation[1], mean = True))
                 else: 
                     validation_errors.append(self.LMS_classification(validation[0], validation[1]))
             #itero sul dataset
@@ -331,19 +341,35 @@ class Network:
                 batch_gradient[1][j] = lambda_tichonov * self.hidden_layers[j].weight_matrix
                 self.hidden_layers[j].weight_matrix += (alpha / len(X) * batch_gradient[0][j])
             self.output_layer.weight_matrix += (alpha / len(X) * batch_gradient[0][-1])
-            batch_gradient[0] = self.backpropagation_iteration(X.iloc[0], y.iloc[0])
+            batch_gradient[0] = self.backpropagation_iteration(X_stand.iloc[0], y_stand.iloc[0])
             for i in range(1, len(X)):
-                #calcolo store_gradient per il pattern corrente con il suo target
-                current_gradient = self.backpropagation_iteration(X.iloc[i], y.iloc[i])
-                #aggiungo il gradiente appena calcolato 
+                current_gradient = self.backpropagation_iteration(X_stand.iloc[i], y_stand.iloc[i]) #Nell'allenamento utilizza i target standardizzati
                 batch_gradient[0] = [batch_gradient[0][i] + current_gradient[i] for i in range(self.depth + 1)]
-            #per ogni hidden layer aggiorno i pesi sommando la matrice batch
             for i in range(self.depth):
                 self.hidden_layers[i].weight_matrix += (batch_gradient[0][i] * eta / len(X)) - batch_gradient[1][i]
             self.output_layer.weight_matrix += (batch_gradient[0][self.depth] * eta / len(X)) - batch_gradient[1][-1]
         if plot:
             self.plot_error(errors, validation_errors, "training_error")
+            self.plot_output(X_stand, y, "Training set")
+            if validation:
+                self.plot_output(validation_input_stand, validation[1], "Validation set")
 
+    def K_fold_CV(self, X, y, fold_number = 4):
+        VL_input_portions = [X.iloc[i::fold_number] for i in range(fold_number)]
+        VL_target_portions = [y.iloc[i::fold_number] for i in range(fold_number)]
+        store_VL_errors = np.zeros(fold_number)
+        for i in range(fold_number):
+            TR_input_portion = X[~X.index.isin(VL_input_portions[i].index)]
+            TR_target_portion = y[~y.index.isin(VL_input_portions[i].index)]
+            validationK = [VL_input_portions[i],VL_target_portions[i]]
+            self.backpropagation_batch(TR_input_portion, TR_target_portion, validationK)
+            current_VL_error = self.LED_regression(validationK[0], validationK[1], True)
+            print(f"Errore sul {i+1}º validation set: {current_VL_error}")
+            store_VL_errors[i] = current_VL_error
+            mean_VL_error = np.sum(store_VL_errors)/fold_number
+            self.reset(self)
+        print(f"Errore medio su tutti le {fold_number} fold: {mean_VL_error}")
+        return mean_VL_error
             
     def backpropagation_online(self, X, y):
         for index, row in X.iterrows():
@@ -453,11 +479,11 @@ class Network:
         store_gradient.reverse()
         return store_gradient
 
-def grid_search(training_data, validation_data, activation_function, max_layer_size = 7, hidden_units = [5, 50], eta = [0, 0.5], lambda_tichonov = [0, 0.5], alpha = [0, 0.5]):
+def grid_search(training_data, validation_data, activation_function, max_layer_size = 7, hidden_units = [5, 50], eta = [-3, -1], lambda_tichonov = [-3, -1], alpha = [0, 0.5], K_fold=False):
     hidden_units_range = np.linspace(hidden_units[0], hidden_units[1], hidden_units[1] // hidden_units[0])
-    eta_range = np.linspace(eta[0], eta[1], 3)
-    lambda_tichonov_range = np.linspace(lambda_tichonov[0], lambda_tichonov[1], 3)
-    alpha_range = np.linspace(alpha[0], alpha[1], 3)
+    eta_range = np.logspace(eta[0], eta[1], num = 3, base = 10)
+    lambda_tichonov_range = np.logspace(lambda_tichonov[0], lambda_tichonov[1], 3)
+    alpha_range = np.logspace(alpha[0], alpha[1], num = 3, base = 10)
     best_model = [0, 0, 0, 0]
     best_validation_error = np.inf
     for current_hidden_units_number in hidden_units_range:
@@ -478,10 +504,15 @@ def grid_search(training_data, validation_data, activation_function, max_layer_s
                     print(f"Eta: {current_eta}")
                     print(f"Lambda: {current_lambda_tichonov}")
                     print(f"Alpha: {current_alpha}")
-                    current_model.backpropagation_batch(training_data[0], training_data[1], batches_number = 100, eta = current_eta, lambda_tichonov=current_lambda_tichonov, alpha = current_alpha, validation = validation_data)
-                    current_validation_error = current_model.LED_regression(validation_data[0], validation_data[1], mean=True)
+                    if K_fold:
+                        current_validation_error = current_model.K_fold_CV(training_data[0], training_data[1], batches_number = 10, eta = current_eta, lambda_tichonov=current_lambda_tichonov, alpha = current_alpha, plot=False)
+                    else:
+                        current_model.backpropagation_batch(training_data[0], training_data[1], batches_number = 100, eta = current_eta, lambda_tichonov=current_lambda_tichonov, alpha = current_alpha, validation = validation_data)
+                        current_validation_error = current_model.LED_regression(validation_data[0], validation_data[1], mean=True)
+                    
                     if current_validation_error < best_validation_error:
                         best_model = [current_hidden_units_number, current_eta, current_lambda_tichonov, current_alpha]
                         best_validation_error = current_validation_error
                     current_model.reset()
+
     return best_model, best_validation_error
