@@ -1,0 +1,2 @@
+con tanh non converge, è un problema legato al delta dell'output layer?
+ (output negativo)
