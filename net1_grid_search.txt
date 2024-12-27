@@ -1,0 +1,9 @@
+|   Indice  |   Iperparametri   |   Errore  |   Commenti
+|   22      |   [-2, -3, -2]    |   1.14    |       
+|   21      |   [-2, -3, -4]    |   1.21    |
+|   22      |   [-2, -3, -2]    |   1.13    |   
+|   5       |   [-4, -3, -2]    |   1.26    |   a e l scambiati rispetto a 21
+|   5       |   [-4, -3, -2]    |   1.32    |   esploso 21 e 22
+|   20      |   [-2, -4, -2]    |   1.22    |   esploso 22
+- set_reset
+|   23      |   [-2, -3, -2]    |   1.68    |   no esp.

@@ -155,9 +155,8 @@ class Network:
 
     def LMS_classification(self, X, y, threshold = 0.5, positive = 1, negative=0, mean = False):
         error = 0
-        X_stand = self.standard(X)
         for i in range(len(X)):
-            output = self.unstandard(self.network_output(X_stand.iloc[i],y))
+            output = self.network_output(X.iloc[i])
             if output >= threshold:
                 discrete_output = positive
             else:

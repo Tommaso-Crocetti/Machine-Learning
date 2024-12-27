@@ -1,15 +1,16 @@
 import pandas as pd
 from NN.Neural_Network import *
+from show_plot import *
 #----------------------------------------------------------------------------------------------------------------------------
 cup_data = pd.read_csv("Dataset/Cup/ML-CUP24-TR.csv", sep=",", header=None, comment="#")
 cup_data = cup_data.sample(frac=1).reset_index(drop=True)
+cup_data_TS = pd.read_csv("Dataset/Cup/ML-CUP24-TS.csv", sep=",", header=None, comment="#")
 
 n_colonne = cup_data.shape[1]
 colonne = ['datanumber'] + [f'feature{i}' for i in range(1, n_colonne - 3)] + ['target_x', 'target_y', 'target_z']
 colonne_TS = ['datanumber'] + [f'feature{i}' for i in range(1, n_colonne - 3)]
 
 cup_data.columns = colonne
-cup_data_TS.columns = colonne_TS
 
 # Separazione input e target
 X = cup_data.drop(columns=["datanumber", 'target_x', 'target_y', 'target_z']) 
