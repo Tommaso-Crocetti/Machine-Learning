@@ -4,7 +4,6 @@ import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
 import pandas as pd
-from ucimlrepo import fetch_ucirepo
 import pickle
 
 class Function(ABC):
@@ -175,7 +174,7 @@ class Network:
     def LED_regression(self, X, y):
         error = 0
         for i in range(len(X)):
-            output = (self.network_output(X.iloc[i])*self.std_mean_arr["y_train_std"]) + self.std_mean_arr["y_train_mean"]
+            output = self.network_output(X.iloc[i])
             error += np.sqrt(np.dot((y.iloc[i] - output), (y.iloc[i] - output)))
         return error / len(X)
 
@@ -286,9 +285,9 @@ class Network:
         store_gradient.reverse()
         return store_gradient
     
-    def grid_search(self, training_data, validation_data, eta_range, lambda_tichonov_range, alpha_range, net_name):
+    def grid_search(self, training_data, validation_data, max_batch_number,eta_range, lambda_tichonov_range, alpha_range, net_name):
         best_comb = -1
-        best_model = [0, 0, 0, 0]
+        best_model = [0, 0, 0]
         best_validation_error = np.inf
         counter = 0
         self.set_reset()
@@ -299,16 +298,17 @@ class Network:
 #                     print(f"Eta: {current_eta}")
 #                     print(f"Lambda: {current_lambda_tichonov}")
 #                     print(f"Alpha: {current_alpha}")
-                    self.backpropagation_batch(training_data[0], training_data[1], standardization = True, tollerance = 3, max_batches_number = 300, eta = 10**current_eta, lambda_tichonov=10**current_lambda_tichonov, alpha = 10**current_alpha, validation = validation_data, plot = True, trial = counter)
+                    self.backpropagation_batch(training_data[0], training_data[1], standardization = True, tollerance = 3, max_batches_number = max_batch_number, eta = 10**current_eta, lambda_tichonov=10**current_lambda_tichonov, alpha = 10**current_alpha, validation = validation_data, plot = True, trial = counter)
                     current_validation_error = self.LED_regression(validation_data[0], validation_data[1])
                     print(f"{counter}, Errore di validazione: {current_validation_error}")
                     if current_validation_error < best_validation_error:
                         best_comb = counter
-                        best_model = [counter, current_eta, current_lambda_tichonov, current_alpha]
+                        best_model = [current_eta, current_lambda_tichonov, current_alpha]
                         best_validation_error = current_validation_error
                     counter += 1
                     self.reset()
-        self.write_result(net_name, best_comb, best_model, best_validation_error)
+        self.write_result(net_name, best_comb, best_model, np.round(best_validation_error, 2))
+        self.save_net("net1", best_comb)
         return best_comb, best_model, best_validation_error
     
     def plot_error(self, errors, validation_errors, filename):
@@ -464,3 +464,31 @@ class Network:
         with open(net_name + "_grid_search.txt", "a") as f:
             f.write(f"\n|\t{best_comb}\t\t|\t{best_model}\t|\t{best_validation_error}\t|")
         f.close()
+
+    def save_net(self, filename, best_comb):
+        with open(filename + str(best_comb) + ".txt", "w") as f:
+            for i, layer in enumerate(self.hidden_layers):
+                f.write(f"Layer {i}:\n")
+                np.savetxt(f, layer.weight_matrix, fmt='%.6f')
+                f.write("\n")
+            f.write("Output Layer:\n")
+            np.savetxt(f, self.output_layer.weight_matrix, fmt='%.6f')
+            f.write("\n")
+
+    def load_weights(self, filename):
+        with open(filename + ".txt", 'r') as f:
+            lines = f.readlines()
+
+            current_layer_weights = []
+            current_layer = self.hidden_layers[0]
+            for line in lines:
+                if line.startswith("Layer"):
+                    layer_number = int(line.split()[1].strip(':'))
+                    current_layer = self.hidden_layers[layer_number]
+                elif line.startswith("Output"):
+                    current_layer = self.output_layer
+                elif not line.strip():
+                    current_layer.weight_matrix = np.array(current_layer_weights)
+                    current_layer_weights = []
+                else:
+                    current_layer_weights.append([float(x) for x in line.split()])

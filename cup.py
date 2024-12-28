@@ -3,7 +3,7 @@ from NN.Neural_Network import *
 from show_plot import *
 #----------------------------------------------------------------------------------------------------------------------------
 cup_data = pd.read_csv("Dataset/Cup/ML-CUP24-TR.csv", sep=",", header=None, comment="#")
-cup_data = cup_data.sample(frac=1).reset_index(drop=True)
+#cup_data = cup_data.sample(frac=1).reset_index(drop=True)
 cup_data_TS = pd.read_csv("Dataset/Cup/ML-CUP24-TS.csv", sep=",", header=None, comment="#")
 
 n_colonne = cup_data.shape[1]
@@ -24,16 +24,15 @@ y_test = y.iloc[train_size:]
 
 network1 = Network(0.5, 3, X.shape[1], [15, 20, 15, 3], [Relu(), Relu(), Relu(), Id()])
 
+network1.load_weights("net123")
+
 network2 = Network(0.5, 4, X.shape[1], [15, 20, 20, 15, 3], [Relu(), Relu(), Relu(), Relu(), Id()])
 
 network3 = Network(0.5, 5, X.shape[1], [15, 20, 30, 20, 15, 3], [Relu(), Relu(), Relu(), Relu(), Id()])
 
-print(network1.grid_search([X_train, y_train], [X_test, y_test], [-4, -3, -2], [-4, -3, -2], [-4, -3, -2], "net1"))
-
+print(network1.grid_search([X_train, y_train], [X_test, y_test], 300, [-4, -3, -2], [-4, -3, -2], [-4, -3, -2], "net1"))
 '''
-print(grid_search([X_train, y_train], [X_test, y_test], Relu()))
-
-network.backpropagation_batch(X_train, y_train, standardization = True, tollerance = 3, max_batches_number = 1000, eta = 0.005, lambda_tichonov = 0.0005, alpha = 0.0025, validation = [X_test, y_test], plot = True)
+network1.backpropagation_batch(X_train, y_train, standardization = True, tollerance = 3, max_batches_number = 100, eta = 0.005, lambda_tichonov = 0.0005, alpha = 0.0025, validation = [X_test, y_test], plot = True)
 
 network.plot_output(X, y, "Cup")
 

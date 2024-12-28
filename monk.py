@@ -22,6 +22,6 @@ test_X_encoded = pd.get_dummies(test_X, dtype=float, columns=[f"feature{i}" for 
 
 network = Network(0.5, 2, X_encoded.shape[1], [3,3,1], [Sigmoid(1),Sigmoid(1),Sigmoid(1)])
 
-network.backpropagation_batch(X_encoded, y, regression = False, mean = False, max_batches_number = 200, eta = 0.1, lambda_tichonov = 0.001, alpha = 0,validation = [test_X_encoded, test_y], plot = True)
+network.backpropagation_batch(X_encoded, y, regression = False, mean = False, max_batches_number = 200, eta = 0.1, lambda_tichonov = 0.001, alpha = 0, validation = [test_X_encoded, test_y], plot = True)
 
 network.plot()
