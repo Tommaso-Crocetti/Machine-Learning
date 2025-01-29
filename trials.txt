@@ -1,0 +1,33 @@
+seed: 1	training_error: 0.7483	validation_error: 0.8096	test_error: 0.8310
+network: [35, 35, 3]	activation_function: ['Tanh', 'Tanh', 'Id']	params: [0.09, 0.001, 0.65]
+
+
+seed: 2	training_error: 0.7293	validation_error: 0.7683	test_error: 0.8762
+network: [35, 35, 3]	activation_function: ['Tanh', 'Tanh', 'Id']	params: [0.07, 0.0005, 0.65]
+
+
+seed: 3	training_error: 0.7043	validation_error: 0.7529	test_error: 0.8223
+network: [50, 50, 3]	activation_function: ['Tanh', 'Tanh', 'Id']	params: [0.09, 0.001, 0.75]
+
+
+seed: 4	training_error: 0.7056	validation_error: 0.7807	test_error: 0.8371
+network: [35, 35, 3]	activation_function: ['Tanh', 'Tanh', 'Id']	params: [0.09, 0.001, 0.75]
+
+
+seed: 5	training_error: 0.7148	validation_error: 0.7886	test_error: 0.8082
+network: [55, 55, 3]	activation_function: ['Tanh', 'Tanh', 'Id']	params: [0.09, 0.001, 0.6]
+
+
+seed: 6	training_error: 0.7417	validation_error: 0.7752	test_error: 0.8378
+network: [45, 45, 3]	activation_function: ['Tanh', 'Tanh', 'Id']	params: [0.09, 0.001, 0.45]
+
+seed: 4	training_error: 0.7812054329324484	validation_error: 0.7807	test_error: 0.8371485490683662
+network: [35, 35, 3]	activation_function: ['Tanh', 'Tanh', 'Id']	params: [0.09, 0.001, 0.75]
+
+
+seed: 5	training_error: 0.8136662135618183	validation_error: 0.7886	test_error: 0.8081730417852202
+network: [55, 55, 3]	activation_function: ['Tanh', 'Tanh', 'Id']	params: [0.09, 0.001, 0.6]
+
+
+seed: 6	training_error: 0.850716255540744	validation_error: 0.7752	test_error: 0.8378366932170689
+network: [45, 45, 3]	activation_function: ['Tanh', 'Tanh', 'Id']	params: [0.09, 0.001, 0.45]
